@@ -25,7 +25,7 @@ python3 -m analysis.memory_scale results/new/tasks.jsonl results/new/memory-scal
 python3 -m unittest discover -s tests
 ```
 
-`memory` launches a fresh process per invocation and reports whole-process peak memory in bytes, including Python and preprocessing. On Windows it reads the peak working set through `GetProcessMemoryInfo`. On macOS and Linux it reads peak RSS through Python's `resource` module. Compare measurements within the same operating system and environment. Its 2-second budget and memory setting are separate from the timing run. The algorithm result records the DP array estimate separately.
+`memory` launches as a fresh process per invocation and reports whole-process peak RSS including Python and preprocessing, not peak DP buffers. Its 2-second budget and memory setting are separate from the timing run. Platform interpretation follows Python's `resource` behavior on macOS and Linux. The DP array estimate is recorded separately in the algorithm result.
 
 ## Workload and split
 

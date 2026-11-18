@@ -1,0 +1,20 @@
+[
+  {
+    "phase": "none",
+    "reps": 20,
+    "tasks": 25,
+    "median_of_medians_ms": 8.739,
+    "p95_of_medians_ms": 40.769,
+    "min_ms": 5.191,
+    "max_ms": 45.915
+  },
+  {
+    "phase": "segdp",
+    "reps": 20,
+    "tasks": 25,
+    "median_of_medians_ms": 10.36,
+    "p95_of_medians_ms": 44.538,
+    "min_ms": 6.034,
+    "max_ms": 55.549
+  }
+]

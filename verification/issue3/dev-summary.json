@@ -1,0 +1,112 @@
+[
+  {
+    "label": "dev nn+2opt baseline (repro)",
+    "machine": {
+      "platform": "win32",
+      "python": "3.12.2 (tags/v3.12.2:6abddd9, Feb  6 2024, 21:26:36) [MSC v.1937 64 bit (AMD64)]",
+      "machine": "independent-repro",
+      "window": 6,
+      "step": 3,
+      "budget_seconds": 0.2,
+      "baseline_commit": "9c03abd (= Sichan 7a9ab03 tree)",
+      "note": "independent reproduction of issue #3 spec; not the original prototype"
+    },
+    "15": {
+      "tasks": 225,
+      "improved": 0,
+      "same": 225,
+      "worsened": 0,
+      "mean_saving_all_m": 0.0,
+      "mean_saving_improved_only_m": null,
+      "median_total_ms": 9.102,
+      "p95_total_ms": 15.428,
+      "budget_exceeded": 0,
+      "timeout_route_returned": 0,
+      "timeout_no_route": 0,
+      "never_worse_violations": 0
+    },
+    "20": {
+      "tasks": 225,
+      "improved": 0,
+      "same": 225,
+      "worsened": 0,
+      "mean_saving_all_m": 0.0,
+      "mean_saving_improved_only_m": null,
+      "median_total_ms": 11.277,
+      "p95_total_ms": 19.316,
+      "budget_exceeded": 0,
+      "timeout_route_returned": 0,
+      "timeout_no_route": 0,
+      "never_worse_violations": 0
+    },
+    "50": {
+      "tasks": 225,
+      "improved": 0,
+      "same": 225,
+      "worsened": 0,
+      "mean_saving_all_m": 0.0,
+      "mean_saving_improved_only_m": null,
+      "median_total_ms": 29.852,
+      "p95_total_ms": 48.01,
+      "budget_exceeded": 0,
+      "timeout_route_returned": 0,
+      "timeout_no_route": 0,
+      "never_worse_violations": 0
+    }
+  },
+  {
+    "label": "dev nn+2opt + segment DP (repro)",
+    "machine": {
+      "platform": "win32",
+      "python": "3.12.2 (tags/v3.12.2:6abddd9, Feb  6 2024, 21:26:36) [MSC v.1937 64 bit (AMD64)]",
+      "machine": "independent-repro",
+      "window": 6,
+      "step": 3,
+      "budget_seconds": 0.2,
+      "baseline_commit": "9c03abd (= Sichan 7a9ab03 tree)",
+      "note": "independent reproduction of issue #3 spec; not the original prototype"
+    },
+    "15": {
+      "tasks": 225,
+      "improved": 39,
+      "same": 186,
+      "worsened": 0,
+      "mean_saving_all_m": 1.2978,
+      "mean_saving_improved_only_m": 7.4872,
+      "median_total_ms": 10.912,
+      "p95_total_ms": 17.939,
+      "budget_exceeded": 0,
+      "timeout_route_returned": 0,
+      "timeout_no_route": 0,
+      "never_worse_violations": 0
+    },
+    "20": {
+      "tasks": 225,
+      "improved": 35,
+      "same": 190,
+      "worsened": 0,
+      "mean_saving_all_m": 0.8711,
+      "mean_saving_improved_only_m": 5.6,
+      "median_total_ms": 13.671,
+      "p95_total_ms": 22.227,
+      "budget_exceeded": 0,
+      "timeout_route_returned": 0,
+      "timeout_no_route": 0,
+      "never_worse_violations": 0
+    },
+    "50": {
+      "tasks": 225,
+      "improved": 9,
+      "same": 216,
+      "worsened": 0,
+      "mean_saving_all_m": 0.2667,
+      "mean_saving_improved_only_m": 6.6667,
+      "median_total_ms": 37.414,
+      "p95_total_ms": 58.397,
+      "budget_exceeded": 0,
+      "timeout_route_returned": 0,
+      "timeout_no_route": 0,
+      "never_worse_violations": 0
+    }
+  }
+]

@@ -1,0 +1,105 @@
+[
+ {
+  "check": "window_dp_vs_bruteforce",
+  "windows_checked": 124,
+  "failures": 0
+ },
+ {
+  "check": "sweep_coverage",
+  "n": 15,
+  "starts": [
+   0,
+   3,
+   6,
+   9
+  ],
+  "first_at_0_last_covers_end": true
+ },
+ {
+  "check": "sweep_coverage",
+  "n": 20,
+  "starts": [
+   0,
+   3,
+   6,
+   9,
+   12,
+   14
+  ],
+  "first_at_0_last_covers_end": true
+ },
+ {
+  "check": "sweep_coverage",
+  "n": 50,
+  "starts": [
+   0,
+   3,
+   6,
+   9,
+   12,
+   15,
+   18,
+   21,
+   24,
+   27,
+   30,
+   33,
+   36,
+   39,
+   42,
+   44
+  ],
+  "first_at_0_last_covers_end": true
+ },
+ {
+  "check": "sweep_coverage",
+  "n": 7,
+  "starts": [
+   0,
+   1
+  ],
+  "first_at_0_last_covers_end": true
+ },
+ {
+  "check": "sweep_coverage",
+  "n": 6,
+  "starts": [
+   0
+  ],
+  "first_at_0_last_covers_end": true
+ },
+ {
+  "check": "sweep_coverage",
+  "n": 5,
+  "starts": [
+   0
+  ],
+  "first_at_0_last_covers_end": true
+ },
+ {
+  "check": "sweep_coverage",
+  "n": 3,
+  "starts": [
+   0
+  ],
+  "first_at_0_last_covers_end": true
+ },
+ {
+  "check": "single_window_optimal_n<=6",
+  "compared": 40,
+  "agreements": 40
+ },
+ {
+  "check": "duplicate_and_SC_requests",
+  "internal_n": 2,
+  "status": "completed",
+  "validated": true
+ },
+ {
+  "check": "forced_timeout_0.5ms_n50",
+  "no_route": 20,
+  "route_returned": 0,
+  "completed": 0,
+  "never_worse_violations": 0
+ }
+]

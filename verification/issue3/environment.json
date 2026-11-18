@@ -1,0 +1,10 @@
+{
+ "platform": "win32",
+ "python": "3.12.2 (tags/v3.12.2:6abddd9, Feb  6 2024, 21:26:36) [MSC v.1937 64 bit (AMD64)]",
+ "machine": "independent-repro",
+ "window": 6,
+ "step": 3,
+ "budget_seconds": 0.2,
+ "baseline_commit": "9c03abd (= Sichan 7a9ab03 tree)",
+ "note": "independent reproduction of issue #3 spec; not the original prototype"
+}

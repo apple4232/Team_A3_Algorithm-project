@@ -10,7 +10,7 @@
 <body>
 <header class="topbar"><div class="brand"><span class="brand-mark">↗</span><span>PICKING <b>LAB</b></span><span class="brand-line"></span><span class="brand-sub">WAREHOUSE ROUTING STUDY</span></div><span class="top-tag"><i></i> LOCAL DEMO</span></header>
 <main>
-  <section class="hero"><div><p class="eyebrow">ALGORITHM EXPLORER <span> / </span> ROLE B</p><h1>같은 주문, <em>다른 경로.</em></h1><p class="intro">작업 조건을 바꿔가며 알고리즘의 선택과 이동 경로를 비교해 보세요.</p></div><div class="hero-meta"><span>EXPERIMENT</span><strong>01 — 08</strong><small>8개의 시나리오 · 9개의 알고리즘</small></div></section>
+  <section class="hero"><div><p class="eyebrow">ALGORITHM EXPLORER <span> / </span> ROLE B</p><h1>같은 주문, <em>다른 경로.</em></h1><p class="intro">작업 조건을 바꿔가며 알고리즘의 선택과 이동 경로를 비교해 보세요.</p></div><div class="hero-meta"><span>EXPERIMENT</span><strong>01 — 09</strong><small>9개의 시나리오 · 12개의 알고리즘</small></div></section>
   <section class="panel filters"><div class="section-head"><div><p class="kicker">01 / SET THE SCENE</p><h2>어떤 상황을 살펴볼까요?</h2></div><span class="hint">시나리오를 선택하면 추천 조건이 적용됩니다</span></div>
     <div class="scenario-grid" id="scenarios" aria-label="시나리오 선택"></div><p id="scenario-description" class="scenario-note"></p>
     <div class="filter-grid">
@@ -21,6 +21,10 @@
       <label>Seed<select id="seed"></select></label>
       <label class="task-filter">작업 ID<select id="task"></select></label>
     </div><div class="selection-foot"><span id="task-count">데이터를 불러오는 중</span><span id="split-note"></span></div>
+  </section>
+  <section id="algorithm-explanation" class="panel filters" aria-labelledby="algorithm-explanation-title" hidden>
+    <h2 id="algorithm-explanation-title">선택한 알고리즘 설명</h2>
+    <div id="algorithm-explanation-content"></div>
   </section>
   <section class="section-head compare-heading"><div><p class="kicker">02 / ROUTE COMPARISON</p><h2>두 경로를 비교해 보세요</h2><p class="hint">저장된 통로 경로를 표시합니다. 번호는 계획된 방문 순서이며 먼저 지나칠 수도 있습니다.</p></div><div class="mode-control"><label for="mode">측정 기준</label><select id="mode"><option value="request">전체 요청 시간</option><option value="candidate">후보 탐색 시간</option></select></div></section>
   <div id="error" class="notice error" role="alert" hidden></div><div id="comparison-note" class="notice" hidden></div>

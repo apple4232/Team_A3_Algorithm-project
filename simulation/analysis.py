@@ -32,7 +32,7 @@ def load(results_dir):
         for line in open(path, encoding="utf-8"):
             if line.strip():
                 r = json.loads(line)
-                r["suite"] = suite
+                r.setdefault("suite", suite)
                 rows.append(r)
     return rows
 
@@ -73,9 +73,10 @@ def main(results_dir="results/multi", out=sys.stdout):
             by[k][key_of(r, candidate_axes) if candidate_axes else ""] = r
         results = defaultdict(lambda: defaultdict(list))  # cell -> seed -> improvements
         details = defaultdict(lambda: {"imp": 0, "same": 0, "worse": 0,
-                                       "walk": [], "wait": [], "p95": [], "n": 0})
+                                       "walk": [], "wait": [], "p95": [], "n": 0,
+                                       "walk_base": []})
         for (bk, seed, split), cells in by.items():
-            base = cells.get("nn") or cells.get((False,)) or None
+            base = cells.get(("nn",)) or cells.get("nn") or None
             if base is None:
                 continue
             for ckey, r in cells.items():
@@ -83,21 +84,25 @@ def main(results_dir="results/multi", out=sys.stdout):
                     continue
                 imp = 100 * (base["metrics"]["makespan_s"] - r["metrics"]["makespan_s"]) \
                     / base["metrics"]["makespan_s"]
-                results[(split,) + (ckey if isinstance(ckey, tuple) else (ckey,))][seed].append(imp)
-                d = details[(split,) + (ckey if isinstance(ckey, tuple) else (ckey,))]
+                cell_key = (split,) + tuple(bk) + tuple(ckey if isinstance(ckey, tuple) else (ckey,))
+                results[cell_key][seed].append(imp)
+                d = details[cell_key]
                 d["imp" if imp > 1e-9 else "same" if imp >= -1e-9 else "worse"] += 1
                 d["walk"].append(r["metrics"]["total_walk_m"])
                 d["wait"].append(r["metrics"]["total_zone_wait_s"])
                 d["p95"].append(r["metrics"]["makespan_s"])
+                d["walk_base"].append(base["metrics"]["total_walk_m"])
                 d["n"] += 1
         for cell in sorted(results):
             groups = results[cell]
             all_vals = [v for g in groups.values() for v in g]
             ci = group_interval(groups)
             d = details[cell]
+            walk_cut = 100 * (mean(d["walk_base"]) - mean(d["walk"])) / mean(d["walk_base"]) \
+                if d["walk_base"] else 0.0
             print(f"{name}{extra_label} {cell}: n={d['n']} mean_improvement={mean(all_vals):+.2f}% "
                   f"ci95=[{ci[0]:+.2f}, {ci[1]:+.2f}] imp/same/worse={d['imp']}/{d['same']}/{d['worse']} "
-                  f"walk_mean={mean(d['walk']):.0f}m wait_mean={mean(d['wait']):.1f}s",
+                  f"walk_mean={mean(d['walk']):.0f}m walk_cut={walk_cut:+.1f}% wait_mean={mean(d['wait']):.1f}s",
                   file=out)
 
     # 1) 주 실험: (pickers, assignment) 기준 셀에서 조합별 개선율
@@ -133,25 +138,32 @@ def main(results_dir="results/multi", out=sys.stdout):
     pp = [r for r in rows if r["suite"] == "per-picker"]
     summarize("per-picker", pp, ["pickers", "assignment"], ["combo"])
 
-    # 5) 혼잡 고려 on/off (eval, balanced+nn-2opt-reinsert)
-    cong = [r for r in rows if r["suite"] == "congestion"]
-    by = defaultdict(dict)
-    for r in cong:
-        k = (_get(r, "pickers"), r["config"]["sim"]["seed"])
-        by[k][_get(r, "congestion")] = r["metrics"]
-    diffs = defaultdict(lambda: defaultdict(list))
-    detail = {"imp": 0, "same": 0, "worse": 0}
-    for (p, seed), cells in by.items():
-        if False in cells and True in cells:
-            base, cand = cells[False], cells[True]
-            imp = 100 * (base["makespan_s"] - cand["makespan_s"]) / base["makespan_s"]
-            diffs[p][seed].append(imp)
-            detail["imp" if imp > 1e-9 else "same" if imp >= -1e-9 else "worse"] += 1
-    for p in sorted(diffs):
-        vals = [v for g in diffs[p].values() for v in g]
-        ci = group_interval(diffs[p])
-        print(f"congestion-aware p={p}: mean={mean(vals):+.2f}% ci95=[{ci[0]:+.2f},{ci[1]:+.2f}] "
-              f"imp/same/worse={detail['imp']}/{detail['same']}/{detail['worse']}", file=out)
+    # 5) 혼잡 고려 on/off (eval, balanced+nn-2opt-reinsert; 균uniform/집중 시나리오 구분)
+    for suite in ("congestion", "congestion-hot"):
+        cong = [r for r in rows if r["suite"] == suite]
+        if not cong:
+            continue
+        by = defaultdict(dict)
+        for r in cong:
+            k = (_get(r, "pickers"), r["config"]["sim"]["seed"])
+            by[k][_get(r, "congestion")] = r["metrics"]
+        diffs = defaultdict(lambda: defaultdict(list))
+        waits = {"off": [], "on": []}
+        detail = {"imp": 0, "same": 0, "worse": 0}
+        for (p, seed), cells in by.items():
+            if False in cells and True in cells:
+                base, cand = cells[False], cells[True]
+                imp = 100 * (base["makespan_s"] - cand["makespan_s"]) / base["makespan_s"]
+                diffs[p][seed].append(imp)
+                detail["imp" if imp > 1e-9 else "same" if imp >= -1e-9 else "worse"] += 1
+                waits["off"].append(base["total_zone_wait_s"])
+                waits["on"].append(cand["total_zone_wait_s"])
+        for p in sorted(diffs):
+            vals = [v for g in diffs[p].values() for v in g]
+            ci = group_interval(diffs[p])
+            print(f"{suite} congestion-aware p={p}: mean={mean(vals):+.2f}% "
+                  f"ci95=[{ci[0]:+.2f},{ci[1]:+.2f}] imp/same/worse={detail['imp']}/{detail['same']}/{detail['worse']} "
+                  f"zone_wait off={mean(waits['off']):.1f}s on={mean(waits['on']):.1f}s", file=out)
 
     # 6) 계획 계산 부담 요약(measured)
     if main_rows:

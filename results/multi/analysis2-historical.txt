@@ -1,0 +1,112 @@
+loaded 762 runs from results/multi
+suites: ['congestion', 'congestion-hot', 'main', 'per-picker', 'sens-Lxcap', 'sens-easy_ratio', 'sens-zone_capacity', 'sens-zone_length']
+
+===== 조합 비교  (기준=nn) =====
+조건(split,p,R,mode,조합)                                             전체산식              CI(전체)      실행평균              CI(평균)      초절감     거리절감
+('dev', 1, 24, 'measured', 'spatial', 'alt')                    +2.65%      [+1.47, +3.60]    +2.59%      [+1.43, +3.59]    29.7s    29.7m
+('dev', 1, 24, 'measured', 'spatial', 'nn-2opt-reinsert')       +2.65%      [+1.47, +3.60]    +2.59%      [+1.43, +3.59]    29.7s    29.7m
+('dev', 10, 240, 'measured', 'spatial', 'alt')                  +1.18%      [+0.62, +1.66]    +1.16%      [+0.60, +1.66]    10.6s    34.0m
+('dev', 10, 240, 'measured', 'spatial', 'nn-2opt-reinsert')      +1.33%      [+0.66, +1.97]    +1.30%      [+0.63, +1.96]    12.0s    49.3m
+('dev', 20, 480, 'measured', 'spatial', 'alt')                  +0.57%      [-0.02, +1.21]    +0.55%      [-0.02, +1.16]     4.9s    43.3m
+('dev', 20, 480, 'measured', 'spatial', 'nn-2opt-reinsert')      +0.55%      [+0.04, +1.16]    +0.55%      [+0.05, +1.14]     4.8s    44.7m
+
+===== 절대값·계산비용 (기준=NN, 제안=조합) =====
+('dev', 1, 24, 'measured', 'alt'): n=6 기준종료=1118.7s 제안종료=1089.0s 절감=29.7s/실행 거리 334→304m 대기 0.0→0.0s 개선/동일/악화=6/0/0 최대악화=0.00%(seed None)
+    계산: 실측 0.05s, 반영지연 0.05s, 작업자 계획대기 0.04s, 마지막완료자 대기 0.0s
+('dev', 1, 24, 'measured', 'nn-2opt-reinsert'): n=6 기준종료=1118.7s 제안종료=1089.0s 절감=29.7s/실행 거리 334→304m 대기 0.0→0.0s 개선/동일/악화=6/0/0 최대악화=0.00%(seed None)
+    계산: 실측 0.05s, 반영지연 0.05s, 작업자 계획대기 0.04s, 마지막완료자 대기 0.0s
+('dev', 10, 240, 'measured', 'alt'): n=6 기준종료=900.2s 제안종료=889.6s 절감=10.6s/실행 거리 1239→1205m 대기 0.0→0.0s 개선/동일/악화=6/0/0 최대악화=0.00%(seed None)
+    계산: 실측 1.71s, 반영지연 0.91s, 작업자 계획대기 8.87s, 마지막완료자 대기 0.0s
+('dev', 10, 240, 'measured', 'nn-2opt-reinsert'): n=6 기준종료=900.2s 제안종료=888.2s 절감=12.0s/실행 거리 1239→1190m 대기 0.0→0.0s 개선/동일/악화=6/0/0 최대악화=0.00%(seed None)
+    계산: 실측 1.68s, 반영지연 0.87s, 작업자 계획대기 8.53s, 마지막완료자 대기 0.0s
+('dev', 20, 480, 'measured', 'alt'): n=6 기준종료=868.5s 제안종료=863.6s 절감=4.9s/실행 거리 2120→2077m 대기 0.0→0.0s 개선/동일/악화=4/0/2 최대악화=-0.05%(seed 210)
+    계산: 실측 4.05s, 반영지연 2.57s, 작업자 계획대기 51.02s, 마지막완료자 대기 0.0s
+('dev', 20, 480, 'measured', 'nn-2opt-reinsert'): n=6 기준종료=868.5s 제안종료=863.7s 절감=4.8s/실행 거리 2120→2076m 대기 0.0→0.0s 개선/동일/악화=4/0/2 최대악화=-0.08%(seed 210)
+    계산: 실측 4.20s, 반영지연 2.73s, 작업자 계획대기 54.18s, 마지막완료자 대기 0.0s
+
+===== 배정 기록 (NN 기준 실행) =====
+('dev', 1, 24, 'measured'): 작업수/실행=0 작업자별작업 분포 min=0/중앙=0/max=0 연쇄시작 합계=0 / 실행평균=0.0 유휴작업자=6 작업시간편차중앙=0s
+('dev', 10, 240, 'measured'): 작업수/실행=0 작업자별작업 분포 min=0/중앙=0/max=0 연쇄시작 합계=0 / 실행평균=0.0 유휴작업자=60 작업시간편차중앙=83s
+('dev', 20, 480, 'measured'): 작업수/실행=0 작업자별작업 분포 min=0/중앙=0/max=0 연쇄시작 합계=0 / 실행평균=0.0 유휴작업자=120 작업시간편차중앙=85s
+
+===== 1차 결과 재계산(전체 산식 / 실행별 평균, 버그 시기 데이터) =====
+('main', 'dev', 1, 'balanced', 'alt'): 전체=+0.38% [+0.15, +0.62] | 실행별평균=+0.38% n=6
+('main', 'dev', 1, 'balanced', 'nn-2opt'): 전체=+0.40% [+0.15, +0.68] | 실행별평균=+0.40% n=6
+('main', 'dev', 1, 'balanced', 'nn-2opt-reinsert'): 전체=+0.38% [+0.15, +0.61] | 실행별평균=+0.38% n=6
+('main', 'dev', 1, 'balanced', 'nn-2opt-reinsert-segdp'): 전체=+0.35% [+0.13, +0.60] | 실행별평균=+0.35% n=6
+('main', 'dev', 1, 'balanced', 'nn-reinsert'): 전체=+0.23% [+0.09, +0.39] | 실행별평균=+0.24% n=6
+('main', 'dev', 1, 'balanced', 'nn-reinsert-2opt'): 전체=+0.38% [+0.14, +0.62] | 실행별평균=+0.38% n=6
+('main', 'dev', 1, 'spatial', 'alt'): 전체=+0.38% [+0.14, +0.63] | 실행별평균=+0.38% n=6
+('main', 'dev', 1, 'spatial', 'nn-2opt'): 전체=+0.40% [+0.15, +0.68] | 실행별평균=+0.40% n=6
+('main', 'dev', 1, 'spatial', 'nn-2opt-reinsert'): 전체=+0.38% [+0.15, +0.63] | 실행별평균=+0.38% n=6
+('main', 'dev', 1, 'spatial', 'nn-2opt-reinsert-segdp'): 전체=+0.36% [+0.13, +0.62] | 실행별평균=+0.36% n=6
+('main', 'dev', 1, 'spatial', 'nn-reinsert'): 전체=+0.23% [+0.09, +0.38] | 실행별평균=+0.24% n=6
+('main', 'dev', 1, 'spatial', 'nn-reinsert-2opt'): 전체=+0.38% [+0.14, +0.63] | 실행별평균=+0.38% n=6
+('main', 'dev', 10, 'balanced', 'alt'): 전체=+0.99% [+0.48, +1.44] | 실행별평균=+0.98% n=6
+('main', 'dev', 10, 'balanced', 'nn-2opt'): 전체=-0.06% [-0.89, +0.94] | 실행별평균=-0.08% n=6
+('main', 'dev', 10, 'balanced', 'nn-2opt-reinsert'): 전체=+1.13% [+0.28, +1.85] | 실행별평균=+1.10% n=6
+('main', 'dev', 10, 'balanced', 'nn-2opt-reinsert-segdp'): 전체=+0.53% [-0.09, +1.12] | 실행별평균=+0.51% n=6
+('main', 'dev', 10, 'balanced', 'nn-reinsert'): 전체=+0.99% [+0.42, +1.50] | 실행별평균=+0.96% n=6
+('main', 'dev', 10, 'balanced', 'nn-reinsert-2opt'): 전체=+1.27% [+0.50, +2.06] | 실행별평균=+1.25% n=6
+('main', 'dev', 10, 'spatial', 'alt'): 전체=+0.78% [-0.14, +1.53] | 실행별평균=+0.75% n=6
+('main', 'dev', 10, 'spatial', 'nn-2opt'): 전체=+0.87% [+0.05, +1.90] | 실행별평균=+0.85% n=6
+('main', 'dev', 10, 'spatial', 'nn-2opt-reinsert'): 전체=+0.99% [+0.00, +1.88] | 실행별평균=+0.94% n=6
+('main', 'dev', 10, 'spatial', 'nn-2opt-reinsert-segdp'): 전체=+1.09% [+0.52, +1.56] | 실행별평균=+1.07% n=6
+('main', 'dev', 10, 'spatial', 'nn-reinsert'): 전체=+1.17% [+0.24, +2.14] | 실행별평균=+1.12% n=6
+('main', 'dev', 10, 'spatial', 'nn-reinsert-2opt'): 전체=+1.46% [+0.43, +2.45] | 실행별평균=+1.41% n=6
+('main', 'dev', 20, 'balanced', 'alt'): 전체=-0.02% [-0.06, +0.03] | 실행별평균=-0.02% n=6
+('main', 'dev', 20, 'balanced', 'nn-2opt'): 전체=-0.01% [-0.04, +0.03] | 실행별평균=-0.00% n=6
+('main', 'dev', 20, 'balanced', 'nn-2opt-reinsert'): 전체=-0.01% [-0.06, +0.05] | 실행별평균=-0.01% n=6
+('main', 'dev', 20, 'balanced', 'nn-2opt-reinsert-segdp'): 전체=+0.03% [-0.06, +0.11] | 실행별평균=+0.03% n=6
+('main', 'dev', 20, 'balanced', 'nn-reinsert'): 전체=-0.01% [-0.11, +0.07] | 실행별평균=-0.02% n=6
+('main', 'dev', 20, 'balanced', 'nn-reinsert-2opt'): 전체=-0.01% [-0.06, +0.06] | 실행별평균=-0.01% n=6
+('main', 'dev', 20, 'spatial', 'alt'): 전체=+0.07% [-0.02, +0.17] | 실행별평균=+0.07% n=6
+('main', 'dev', 20, 'spatial', 'nn-2opt'): 전체=+0.03% [-0.04, +0.07] | 실행별평균=+0.02% n=6
+('main', 'dev', 20, 'spatial', 'nn-2opt-reinsert'): 전체=+0.01% [-0.08, +0.08] | 실행별평균=+0.01% n=6
+('main', 'dev', 20, 'spatial', 'nn-2opt-reinsert-segdp'): 전체=-0.05% [-0.16, +0.06] | 실행별평균=-0.05% n=6
+('main', 'dev', 20, 'spatial', 'nn-reinsert'): 전체=+0.02% [-0.06, +0.10] | 실행별평균=+0.01% n=6
+('main', 'dev', 20, 'spatial', 'nn-reinsert-2opt'): 전체=+0.04% [-0.02, +0.10] | 실행별평균=+0.04% n=6
+('main', 'eval', 1, 'balanced', 'alt'): 전체=+0.17% [+0.03, +0.32] | 실행별평균=+0.17% n=6
+('main', 'eval', 1, 'balanced', 'nn-2opt'): 전체=+0.09% [+0.02, +0.22] | 실행별평균=+0.09% n=6
+('main', 'eval', 1, 'balanced', 'nn-2opt-reinsert'): 전체=+0.17% [+0.03, +0.31] | 실행별평균=+0.17% n=6
+('main', 'eval', 1, 'balanced', 'nn-2opt-reinsert-segdp'): 전체=+0.17% [+0.03, +0.32] | 실행별평균=+0.17% n=6
+('main', 'eval', 1, 'balanced', 'nn-reinsert'): 전체=+0.17% [+0.00, +0.36] | 실행별평균=+0.17% n=6
+('main', 'eval', 1, 'balanced', 'nn-reinsert-2opt'): 전체=+0.17% [+0.03, +0.32] | 실행별평균=+0.17% n=6
+('main', 'eval', 1, 'spatial', 'alt'): 전체=+0.17% [+0.03, +0.32] | 실행별평균=+0.17% n=6
+('main', 'eval', 1, 'spatial', 'nn-2opt'): 전체=+0.09% [+0.01, +0.21] | 실행별평균=+0.09% n=6
+('main', 'eval', 1, 'spatial', 'nn-2opt-reinsert'): 전체=+0.17% [+0.03, +0.32] | 실행별평균=+0.17% n=6
+('main', 'eval', 1, 'spatial', 'nn-2opt-reinsert-segdp'): 전체=+0.17% [+0.03, +0.31] | 실행별평균=+0.17% n=6
+('main', 'eval', 1, 'spatial', 'nn-reinsert'): 전체=+0.17% [-0.00, +0.36] | 실행별평균=+0.17% n=6
+('main', 'eval', 1, 'spatial', 'nn-reinsert-2opt'): 전체=+0.18% [+0.03, +0.32] | 실행별평균=+0.18% n=6
+('main', 'eval', 10, 'balanced', 'alt'): 전체=+0.98% [+0.28, +1.62] | 실행별평균=+0.98% n=6
+('main', 'eval', 10, 'balanced', 'nn-2opt'): 전체=+0.83% [+0.31, +1.42] | 실행별평균=+0.84% n=6
+('main', 'eval', 10, 'balanced', 'nn-2opt-reinsert'): 전체=+0.66% [-0.01, +1.38] | 실행별평균=+0.65% n=6
+('main', 'eval', 10, 'balanced', 'nn-2opt-reinsert-segdp'): 전체=+0.99% [-0.47, +2.24] | 실행별평균=+0.98% n=6
+('main', 'eval', 10, 'balanced', 'nn-reinsert'): 전체=+0.59% [-0.78, +1.88] | 실행별평균=+0.59% n=6
+('main', 'eval', 10, 'balanced', 'nn-reinsert-2opt'): 전체=+1.14% [+0.23, +2.14] | 실행별평균=+1.14% n=6
+('main', 'eval', 10, 'spatial', 'alt'): 전체=+0.43% [-0.47, +1.33] | 실행별평균=+0.42% n=6
+('main', 'eval', 10, 'spatial', 'nn-2opt'): 전체=+0.36% [-0.32, +1.09] | 실행별평균=+0.37% n=6
+('main', 'eval', 10, 'spatial', 'nn-2opt-reinsert'): 전체=+0.22% [-0.48, +0.96] | 실행별평균=+0.21% n=6
+('main', 'eval', 10, 'spatial', 'nn-2opt-reinsert-segdp'): 전체=+0.83% [+0.13, +1.52] | 실행별평균=+0.82% n=6
+('main', 'eval', 10, 'spatial', 'nn-reinsert'): 전체=+0.35% [-0.60, +1.29] | 실행별평균=+0.35% n=6
+('main', 'eval', 10, 'spatial', 'nn-reinsert-2opt'): 전체=+0.41% [-0.05, +1.00] | 실행별평균=+0.41% n=6
+('main', 'eval', 20, 'balanced', 'alt'): 전체=-0.04% [-0.12, +0.04] | 실행별평균=-0.04% n=6
+('main', 'eval', 20, 'balanced', 'nn-2opt'): 전체=+0.04% [-0.05, +0.15] | 실행별평균=+0.04% n=6
+('main', 'eval', 20, 'balanced', 'nn-2opt-reinsert'): 전체=-0.02% [-0.13, +0.08] | 실행별평균=-0.02% n=6
+('main', 'eval', 20, 'balanced', 'nn-2opt-reinsert-segdp'): 전체=-0.02% [-0.11, +0.07] | 실행별평균=-0.02% n=6
+('main', 'eval', 20, 'balanced', 'nn-reinsert'): 전체=-0.05% [-0.18, +0.08] | 실행별평균=-0.05% n=6
+('main', 'eval', 20, 'balanced', 'nn-reinsert-2opt'): 전체=-0.01% [-0.09, +0.07] | 실행별평균=-0.01% n=6
+('main', 'eval', 20, 'spatial', 'alt'): 전체=-0.02% [-0.12, +0.07] | 실행별평균=-0.02% n=6
+('main', 'eval', 20, 'spatial', 'nn-2opt'): 전체=+0.04% [-0.08, +0.18] | 실행별평균=+0.04% n=6
+('main', 'eval', 20, 'spatial', 'nn-2opt-reinsert'): 전체=+0.01% [-0.06, +0.08] | 실행별평균=+0.01% n=6
+('main', 'eval', 20, 'spatial', 'nn-2opt-reinsert-segdp'): 전체=+0.06% [+0.01, +0.14] | 실행별평균=+0.06% n=6
+('main', 'eval', 20, 'spatial', 'nn-reinsert'): 전체=+0.00% [-0.03, +0.04] | 실행별평균=+0.00% n=6
+('main', 'eval', 20, 'spatial', 'nn-reinsert-2opt'): 전체=+0.04% [-0.04, +0.14] | 실행별평균=+0.04% n=6
+('per-picker', 'dev', 1, 'spatial', 'alt'): 전체=+2.65% [+1.47, +3.60] | 실행별평균=+2.59% n=6
+('per-picker', 'dev', 1, 'spatial', 'nn-2opt-reinsert'): 전체=+2.65% [+1.47, +3.60] | 실행별평균=+2.59% n=6
+('per-picker', 'dev', 10, 'spatial', 'alt'): 전체=+1.18% [+0.62, +1.66] | 실행별평균=+1.16% n=6
+('per-picker', 'dev', 10, 'spatial', 'nn-2opt-reinsert'): 전체=+1.33% [+0.66, +1.97] | 실행별평균=+1.30% n=6
+('per-picker', 'dev', 20, 'spatial', 'alt'): 전체=+0.57% [-0.02, +1.21] | 실행별평균=+0.55% n=6
+('per-picker', 'dev', 20, 'spatial', 'nn-2opt-reinsert'): 전체=+0.55% [+0.04, +1.16] | 실행별평균=+0.55% n=6
+
+===== 혼잡 고려 추적 (극한 시나리오, 쌍 비교) =====

@@ -205,7 +205,7 @@ def assignment_records(rows, out, suites):
               f"작업자별작업 분포 min={min(per_picker_all) if per_picker_all else 0}/"
               f"중앙={median(per_picker_all) if per_picker_all else 0}/"
               f"max={max(per_picker_all) if per_picker_all else 0} "
-              f"연쇄시작(직전 하차지 출발 작업수)={chained} "
+              f"연쇄시작 합계={chained} / 실행평균={chained / len(group):.1f} "
               f"유휴작업자={idle_runs} 작업시간편차중앙={median(spreads):.0f}s",
               file=out)
 
@@ -277,8 +277,8 @@ def congestion_tracking(rows, out):
         if both:
             reduced = sum(dw for dw, _ in both if dw > 0)
             grew = sum(dk for _, dk in both if dk > 0)
-            print(f"    [가설 검증] 대기감소 합 {reduced:.0f}s vs 거리증가 합 {grew:.0f}m"
-                  f" -> {'거리 증가가 우세(시간환산 시)' if grew > reduced else '대기 감소가 우세'}",
+            print(f"    [참고 집계] 대기감소 합 {reduced:.0f}s vs 거리증가 합 {grew:.0f}m"
+                  " (서로 다른 양의 변화 집계이며, 종료시간 악화의 인과 증거가 아님)",
                   file=out)
 
 
@@ -306,7 +306,8 @@ def adoption_vs_actual(rows, out):
 # ------------------------------------------------------- 기존 결과 재계산
 def recompute_old(rows, out):
     """1차 결과(results/multi)를 두 산식으로 재계산 — 순차자원 버그 시기 데이터."""
-    subset = [r for r in rows if r["suite"] in ("main", "per-picker")]
+    subset = [r for r in rows if r["suite"] in ("main", "per-picker")
+              and "task_records" not in r]
     if not subset:
         return
     by = defaultdict(dict)

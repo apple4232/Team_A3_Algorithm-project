@@ -4,7 +4,7 @@ This project asks a practical question: **when one picker must collect items and
 
 The picker starts at `S`, visits every required location in `P`, and finishes at `C`. The project compares route distance and computation time. Its longer-term goal is to build simple algorithm-selection rules from experiments, rather than assume one method is best for every order.
 
-**Current status - November 6, 2026:** the warehouse model, shortest-path layer, routing algorithms, and correctness checks are implemented. Role B experiment tools and an exploratory workload-selection study are implemented; the UI remains planned.
+**Current status - November 20, 2026:** the warehouse model, routing algorithms, experiment tools, offline selection study, and local demonstration are implemented. The request runner uses a manually selected algorithm; multi-picker simulation remains future work.
 
 ## 1. What does one task mean?
 
@@ -60,7 +60,7 @@ The experiment package contains an offline rule trainer and held-out policy eval
 | Request execution | Manually specified candidate, an NN fallback route, and stage timings |
 | Verification | Automated routing and experiment tests, including exact-solution agreement and failure handling |
 
-The experiment package provides feature extraction, seeded A-H workload views, batch measurements and offline selection rules. The production request runner has not integrated those rules, and Streamlit remains future work. See [Role B experiments](docs/08-role-b-experiments.md).
+The experiment package provides feature extraction, seeded A-H workload views, batch measurements and offline selection rules. The request runner has not integrated those rules. A local demonstration is available below. See [Role B experiments](docs/08-role-b-experiments.md).
 
 ### The warehouse
 
@@ -87,6 +87,9 @@ Distances follow aisle centerlines. Horizontal edges exist only on the three cro
 | `ca-plus` | Minimizes `d(current, item) + coefficient * d(item, C)` |
 | `ca-minus` | Minimizes `d(current, item) - coefficient * d(item, C)` |
 | `nn+2opt` | Improves an NN order |
+| `nn+2opt+reinsert` | Improves the NN + 2-opt order by moving one location at a time |
+| `nn+2opt+reinsert-twice` | Applies reinsertion twice |
+| `nn+2opt+reinsert+segment-dp` | Applies reinsertion, then optimizes small consecutive segments with DP |
 | `ca-plus+2opt` | Improves a CA-plus order |
 | `ca-minus+2opt` | Improves a CA-minus order |
 
@@ -205,7 +208,7 @@ The November 2 documents retain the earlier research design. The baseline and co
 
 Source code is in `picking/`; correctness tests are in `tests/`.
 
-The experiment workflow and offline selector evaluation are described in [Role B experiments](docs/08-role-b-experiments.md). Production integration and a UI remain separate work.
+The experiment workflow and offline selector evaluation are described in [Role B experiments](docs/08-role-b-experiments.md). Automatic selection in the request runner remains future work.
 
 ## Local demonstration
 
@@ -217,6 +220,8 @@ python3 -m demo
 
 Open `http://127.0.0.1:8765/` in a browser. Python 3 is the only runtime dependency. Use `--port 8766` if the default port is occupied. The server is available only on this computer; stop it with Ctrl+C.
 
-The page compares the stored candidate or complete-request records and animates reconstructed aisle paths. A–H are overlapping experimental views. F and H automatically select the matching task on the second map; other views compare two algorithms on the same task. The recalculation button executes only the selected candidates, retains the saved data, and labels newly measured times separately. Conditions and timeouts can change the result. The graph animation is explanatory, not a measurement of physical walking time.
+The page compares the stored candidate or complete-request records and animates reconstructed aisle paths. A–H are overlapping experimental views. F and H automatically select the matching task on the second map; other views compare two algorithms on the same task. Recalculation runs all algorithms for tasks matching the current filters, keeps the saved data unchanged, and labels newly measured times separately. Conditions and timeouts can change the result. The graph animation is explanatory, not a measurement of physical walking time.
 
 The viewer requires `results/full/tasks.jsonl`, `rules.json`, and the development/evaluation candidate/request JSONL files. If they are unavailable, follow [Role B experiments](docs/08-role-b-experiments.md) to recreate the data, placing the output in `results/full`. The files are large and loading takes a few seconds. The UI never rewrites the experiment records.
+
+NN remains the distance baseline. Budgeted improvement summaries pair only results completed within budget; request records also report a separate reference comparison when a validated NN route exists after a timeout, including pair and timeout counts. Candidate-only records do not supply a stored validated path for that reference.

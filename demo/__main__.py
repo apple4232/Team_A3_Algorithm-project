@@ -79,19 +79,23 @@ class Dataset:
                 self.tasks[task['id']] = task
         for split in ('dev', 'eval'):
             for mode in self.rows:
-                with (directory / f'{split}-{mode}.jsonl').open(encoding='utf-8') as handle:
-                    for line in handle:
-                        row = json.loads(line)
-                        task_id = row['task']['id']
-                        if task_id not in self.tasks:
-                            raise ValueError(f'unknown task in data: {task_id}')
-                        record = self.rows[mode].setdefault(task_id, {'features': row['features'], 'results': {}})
-                        result = normalized(row)
-                        # The warehouse has 210 nodes, so each path node fits in one byte.
-                        for field in ('order', 'path'):
-                            if result[field] is not None:
-                                result[field] = bytes(int(x // 4) * 21 + int(y // 2) for x, y in result[field])
-                        record['results'][row['algorithm']] = result
+                files = [directory / f'{split}-{mode}.jsonl', directory / f'{split}-{mode}-additional.jsonl']
+                for file in files:
+                    if not file.exists() and file == files[1]:
+                        continue
+                    with file.open(encoding='utf-8') as handle:
+                        for line in handle:
+                            row = json.loads(line)
+                            task_id = row['task']['id']
+                            if task_id not in self.tasks:
+                                raise ValueError(f'unknown task in data: {task_id}')
+                            record = self.rows[mode].setdefault(task_id, {'features': row['features'], 'results': {}})
+                            result = normalized(row)
+                            # The warehouse has 210 nodes, so each path node fits in one byte.
+                            for field in ('order', 'path'):
+                                if result[field] is not None:
+                                    result[field] = bytes(int(x // 4) * 21 + int(y // 2) for x, y in result[field])
+                            record['results'][row['algorithm']] = result
         with (directory / 'rules.json').open(encoding='utf-8') as handle:
             self.rules = json.load(handle)
 
@@ -196,7 +200,11 @@ def make_handler(dataset, load_error=None):
                 elif parsed.path == '/api/detail':
                     self.send_json(dataset.detail(params.get('id'), params.get('mode', 'request')))
                 elif parsed.path == '/api/aggregate':
-                    self.send_json(dataset.aggregate(dataset.query(params), params.get('mode', 'request')))
+                    selected = dataset.query(params)
+                    if params.get('pair') in ('F', 'H'):
+                        selected = [dataset.tasks[pid] for task in selected
+                                    if (pid := pair_id(task, params['pair'])) in dataset.tasks]
+                    self.send_json(dataset.aggregate(selected, params.get('mode', 'request')))
                 elif parsed.path in ('/', '/app.js', '/style.css'):
                     name = 'index.html' if parsed.path == '/' else parsed.path[1:]
                     data = (STATIC / name).read_bytes()

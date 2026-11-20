@@ -1,5 +1,7 @@
 # Project Guide: Scope, Progress, and Team Responsibilities
 
+> **Expansion branch:** start with [Project Expansion: Progress and Follow-up](docs/16-project-expansion-status.md) for the implemented multi-picker simulation, inherited experiments, and pending corrections. The historical scope below describes the original single-picker baseline.
+
 As of November 6, 2026.
 
 This guide gives a new teammate or AI assistant one place to understand the project, its current implementation, and the responsibilities of A, B, and C. The letters identify responsibilities without publishing personal names. They do not identify commit authors or imply that all planned work is complete.

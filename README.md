@@ -1,5 +1,7 @@
 # Workload-Aware Warehouse Picking
 
+> **Project expansion — November 20, 2026:** this branch also contains the initial multi-picker, U-shaped-conveyor and pickup-congestion simulation. Read [progress and required follow-up](docs/16-project-expansion-status.md) first, then the [initial design and experiments](docs/15-multi-picker-simulation.md). Source: [simulation/](simulation/); evidence: [results/multi/](results/multi/). Existing tests pass, but stronger validation and new experiments are pending. The sections below describe the original single-picker baseline. A local demo exists in `demo/`; historical statements that the UI is planned are outdated.
+
 This project asks a practical question: **when one picker must collect items and deliver them to a fixed conveyor, which routing method should be used for each task?**
 
 The picker starts at `S`, visits every required location in `P`, and finishes at `C`. The project compares route distance and computation time. Its longer-term goal is to build simple algorithm-selection rules from experiments, rather than assume one method is best for every order.

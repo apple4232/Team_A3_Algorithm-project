@@ -10,6 +10,8 @@ This branch preserves the initial multi-picker implementation and its explorator
 
 Read this status before interpreting the [initial design and results](15-multi-picker-simulation.md). That report records the first implementation; the qualifications below supersede broader conclusions in that report.
 
+The tracked [expansion plan and acceptance criteria](17-expansion-plan.md) preserve the proposal from PR #5. They describe the target scope, not a claim that all work is complete.
+
 ## Preserved implementation and history
 
 The implementation was recovered from the local `multi-picker-simulation` branch. Its history is preserved:

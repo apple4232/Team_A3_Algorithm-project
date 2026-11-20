@@ -15,8 +15,10 @@ import sys
 import time
 from collections import defaultdict
 
+from .assignment import Interrupted as AssignInterrupted
 from .assignment import task_estimate
 from .planner import PlanState, Planner, TaskPlan
+from .routes import Interrupted as RouteInterrupted
 from .routes import RouteContext
 from .warehouse import zone_of
 
@@ -24,8 +26,13 @@ PRIO_DONE, PRIO_ARRIVE, PRIO_PLAN = 0, 1, 2
 OPEN_STATUSES = ("pending", "prerouted", "reserved")
 
 
-def simulate(run_cfg, warehouse, requests, planner_cls=Planner):
-    """전체 실험 1회 실행: 지표·작업 기록·(선택)이벤트 로그 반환."""
+def simulate(run_cfg, warehouse, requests, planner_cls=Planner, stop_check=None):
+    """전체 실험 1회 실행: 지표·작업 기록·(선택)이벤트 로그 반환.
+
+    stop_check는 계획 단계(초기화·경로·배정 개선·검증 직전)의 협력적 검사점에서
+    호출된다. raise하면 해당 후보만 폐기하고 마지막 유효 계획으로 진행하며,
+    중단은 plan.aborts에 기록된다.
+    """
     t_heap, seq = [], [0]
 
     def push(at, prio, kind, payload):
@@ -54,7 +61,21 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner):
     pending_ops, op_seq = [], [0]
     planner_free_at = [0.0]
     plan_stats = {"ops": 0, "preroute_reuse": 0, "improve_rounds": 0,
-                  "moves_applied": 0, "improve_discarded": 0}
+                  "moves_applied": 0, "improve_discarded": 0, "aborts": []}
+    adoption_log = []
+    stop_fired = [False]
+
+    def checked_stop():
+        """중단 주입 지점: 최초 발생만 기록하고 원래 예외를 전파한다."""
+        if stop_check is None:
+            return
+        try:
+            stop_check()
+        except BaseException as exc:
+            if not stop_fired[0]:
+                stop_fired[0] = True
+                plan_stats["aborts"].append({"exception": type(exc).__name__})
+            raise
     improve_rounds_left = run_cfg.plan.move_swap_rounds if run_cfg.plan.move_swap else 0
     improve_inflight = [False]
 
@@ -165,14 +186,20 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner):
         schedule_planner(now)
 
     def run_op(op, now):
-        """PLAN_START: 계산 수행 후 PLAN_DONE을 (now+지속)에 예약한다."""
+        """PLAN_START: 계산 수행 후 PLAN_DONE을 (now+지속)에 예약한다.
+
+        op가 시작된 순간 계산 자원을 (완료 예정 시각까지) 사용 중으로 표시해,
+        실행 중인 op와 다음 op가 겹치지 않게 한다(순차 자원 보장).
+        """
         if op["kind"] == "IMPROVE":
             improve_inflight[0] = True
         if op["kind"] == "ROUTE":
             task, p = find_task(op["tid"]), pickers[op["picker"]]
             if task is None or task.status != "reserved":
                 return  # 재그룹화 등으로 무효화된 op: 폐기(유효 계획 유지)
-            order, nn_cost, cost, duration = planner.route_for(task, p["node"])
+            order, nn_cost, cost, duration = planner.route_for(task, p["node"],
+                                                               stop_check=checked_stop)
+            planner_free_at[0] = now + duration
             push(now + duration, PRIO_PLAN, "PLAN_DONE",
                  {"kind": "ROUTE", "task": task, "picker": p["id"], "route": order,
                   "nn_cost": nn_cost, "cost": cost})
@@ -180,16 +207,26 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner):
             task = find_task(op["tid"])
             if task is None or task.status != "pending":
                 return
-            order, _nn, _cost, duration = planner.route_for(task, op["start"])
+            order, _nn, _cost, duration = planner.route_for(task, op["start"],
+                                                            stop_check=checked_stop)
+            planner_free_at[0] = now + duration
             push(now + duration, PRIO_PLAN, "PLAN_DONE",
                  {"kind": "PREROUTE", "task": task, "route": order, "start": op["start"]})
         elif op["kind"] == "IMPROVE":
             t_w = time.perf_counter()
             groups = [[r for r in t.requests] for t in candidates() if t.status == "pending"]
-            new_groups = planner.improve_groups(groups)
+            try:
+                new_groups = planner.improve_groups(groups, stop_check=checked_stop,
+                                                    log=adoption_log)
+            except AssignInterrupted:
+                plan_stats["ops"] += 1
+                planner_free_at[0] = now
+                push(now, PRIO_PLAN, "PLAN_DONE", {"kind": "IMPROVE_ABORTED"})
+                return
             wall = time.perf_counter() - t_w
             duration = planner.fixed_improve_duration() if planner.mode == "fixed" else wall
             planner.wall_total += wall
+            planner_free_at[0] = now + duration
             push(now + duration, PRIO_PLAN, "PLAN_DONE",
                  {"kind": "IMPROVE", "groups": new_groups,
                   "changed": [tuple(r["id"] for r in g) for g in new_groups] !=
@@ -198,7 +235,8 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner):
 
     # ---- 초기 계획(계산은 t=0에 수행, 지속시간 d0 후 반영) ----
     wall0 = time.perf_counter()
-    tasks, d0 = planner.initial_plan(requests)
+    tasks, d0 = planner.initial_plan(requests, stop_check=checked_stop,
+                                     log=adoption_log)
     state.tasks = tasks
     ok, why = state.validate(request_ids, run_cfg.plan)
     if not ok:
@@ -237,6 +275,8 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner):
                 if task.status == "pending":  # 아직 발급 전이면 사전 경로 저장
                     task.status, task.route = "prerouted", payload["route"]
                     task.preroute_start = payload["start"]
+            elif payload["kind"] == "IMPROVE_ABORTED":
+                improve_inflight[0] = False  # 중단: 후보 폐기, 마지막 유효 계획 유지
             elif payload["kind"] == "IMPROVE":
                 improve_inflight[0] = False
                 plan_stats["improve_rounds"] += 1
@@ -248,21 +288,27 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner):
                 if captured != current:
                     plan_stats["improve_discarded"] = plan_stats.get("improve_discarded", 0) + 1
                 else:
-                    if payload["changed"]:
-                        plan_stats["moves_applied"] += 1
-                    preserved = [t for t in state.tasks if t.status != "pending"]
-                    new_tasks = []
-                    for i, group in enumerate(payload["groups"]):
-                        t = TaskPlan(tid=10_000 + plan_stats["improve_rounds"] * 1000 + i,
-                                     requests=list(group))
-                        t.est_time = task_estimate(group, warehouse, warehouse.staging,
-                                                   pick_cfg, speed)["time_s"]
-                        new_tasks.append(t)
-                    state.tasks = preserved + new_tasks
-                    state.tasks.sort(key=lambda t: (-t.est_time, t.tid))
-                    ok, why = state.validate(request_ids, run_cfg.plan)
-                    if not ok:
-                        raise RuntimeError(f"배정 개선 후 불변식 위반: {why}")
+                    try:
+                        checked_stop()  # 최종 검증 직전 중단 지점
+                        preserved = [t for t in state.tasks if t.status != "pending"]
+                        new_tasks = []
+                        for i, group in enumerate(payload["groups"]):
+                            t = TaskPlan(tid=10_000 + plan_stats["improve_rounds"] * 1000 + i,
+                                         requests=list(group))
+                            t.est_time = task_estimate(group, warehouse, warehouse.staging,
+                                                       pick_cfg, speed)["time_s"]
+                            new_tasks.append(t)
+                        candidate = preserved + new_tasks
+                        candidate.sort(key=lambda t: (-t.est_time, t.tid))
+                        ok, why = PlanState(tasks=list(candidate)).validate(
+                            request_ids, run_cfg.plan)
+                        if not ok:
+                            raise RuntimeError(f"배정 개선 후 불변식 위반: {why}")
+                        state.tasks = candidate  # 검증 통과 후에만 반영
+                        if payload["changed"]:
+                            plan_stats["moves_applied"] += 1
+                    except (AssignInterrupted, RouteInterrupted):
+                        plan_stats["improve_discarded"] += 1  # 검증 단계 중단: 미반영
             improve_pending = (improve_inflight[0]
                                or any(op[2]["kind"] == "IMPROVE" for op in pending_ops))
             if (improve_rounds_left > 0 and not improve_pending
@@ -322,7 +368,15 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner):
     pred_errors = [abs(r["pred_finish"] - r["finished_at"])
                    for r in task_records if r["pred_finish"] is not None]
     busy_values = [p["busy_s"] for p in pickers.values()]
+    last_task = max(task_records, key=lambda r: r["finished_at"]) if task_records else None
+    last_picker = pickers[last_task["picker"]] if last_task else None
     return {
+        "last_finisher": (None if last_task is None else {
+            "picker": last_task["picker"], "finished_at": last_task["finished_at"],
+            "zone_wait_s": last_picker["zone_wait_s"],
+            "plan_wait_s": last_picker["plan_wait_s"],
+            "walk_m": last_picker["walk_m"], "tasks": last_picker["tasks"],
+        }),
         "makespan_s": round(makespan, 6),
         "tasks_done": len(task_records),
         "total_walk_m": round(sum(p["walk_m"] for p in pickers.values()), 6),
@@ -338,7 +392,9 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner):
                  "preroute_reuse": plan_stats["preroute_reuse"],
                  "improve_rounds": plan_stats["improve_rounds"],
                  "moves_applied": plan_stats["moves_applied"],
-                 "improve_discarded": plan_stats["improve_discarded"]},
+                 "improve_discarded": plan_stats["improve_discarded"],
+                 "aborts": plan_stats["aborts"],
+                 "adoption_log": adoption_log},
         "prediction_mae_s": round(sum(pred_errors) / len(pred_errors), 6) if pred_errors else None,
         "prediction_tasks": len(pred_errors),
         "edge_overlap_pairs": _count_overlaps(edge_log),

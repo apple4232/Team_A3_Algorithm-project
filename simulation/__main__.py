@@ -191,9 +191,20 @@ def _write(out_dir, name, rows):
     with open(out / f"{name}.jsonl", "x", encoding="utf-8") as f:
         for r in rows:
             slim = {k: v for k, v in r.items() if k != "metrics"}
-            slim["metrics"] = {k: v for k, v in r["metrics"].items()
+            m = r["metrics"]
+            slim["metrics"] = {k: v for k, v in m.items()
                                if k not in ("task_records", "events", "pickers")}
-            slim["task_count"] = len(r["metrics"]["task_records"])
+            # 작업 단위 분석 가능하도록 원자료에 작업 기록·작업자 요약 저장
+            slim["task_count"] = len(m["task_records"])
+            slim["task_records"] = [{"tid": t["tid"], "picker": t["picker"],
+                                     "n_requests": len(t["requests"]),
+                                     "issued_at": t["issued_at"],
+                                     "finished_at": t["finished_at"],
+                                     "pred_finish": t["pred_finish"],
+                                     "start_node": list(t["start_node"]) if t["start_node"] else None,
+                                     "nn_cost": t["nn_cost"], "final_cost": t["final_cost"]}
+                                    for t in m["task_records"]]
+            slim["pickers"] = m["pickers"]
             f.write(json.dumps(slim, ensure_ascii=False) + "\n")
     print(f"wrote {out / name}.jsonl ({len(rows)} runs)")
 

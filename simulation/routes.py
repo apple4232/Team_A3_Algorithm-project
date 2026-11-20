@@ -46,11 +46,19 @@ class RouteContext:
         return total + self.end_cost(order[-1])
 
 
+class Interrupted(Exception):
+    """협력적 중단(주입용). 예산 초과와 같은 규칙으로 마지막 유효 경로를 보존한다."""
+    pass
+
+
 class _Meter:
-    def __init__(self, budget):
+    def __init__(self, budget, stop_check=None):
         self.left = budget
+        self.stop_check = stop_check
 
     def spend(self, n=1):
+        if self.stop_check is not None:
+            self.stop_check()  # 평가 검사점마다 중단 확인
         self.left -= n
         if self.left < 0:
             raise BudgetExceeded
@@ -147,9 +155,13 @@ def _window_exact(ctx, seg, left, right, meter):
 
 
 def improve(ctx: RouteContext, combo: str, order=None, budget=20000,
-            segdp_window=6, segdp_step=3):
-    """조합 이름에 따라 경로를 개선한다. 중단 시 마지막 유효 경로 반환."""
-    meter = _Meter(budget)
+            segdp_window=6, segdp_step=3, stop_check=None):
+    """조합 이름에 따라 경로를 개선한다. 중단 시 마지막 유효 경로 반환.
+
+    stop_check는 각 평가 검사점에서 호출되며 Interrupted를 raise하면 그 즉시
+    현재(마지막 유효) 경로를 반환한다(예산 초과와 동일한 보존 규칙).
+    """
+    meter = _Meter(budget, stop_check)
     order = list(order if order is not None else nn_order(ctx))
     try:
         if combo == "nn":
@@ -174,8 +186,8 @@ def improve(ctx: RouteContext, combo: str, order=None, budget=20000,
             order = segment_dp(ctx, order, meter, segdp_window, segdp_step)
         else:
             raise ValueError(f"알 수 없는 조합: {combo}")
-    except BudgetExceeded:
-        pass  # 협력적 예산: 마지막 유효 경로 반환
+    except (BudgetExceeded, Interrupted):
+        pass  # 협력적 중단: 마지막 유효 경로 반환
     return order
 
 

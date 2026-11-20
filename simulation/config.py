@@ -54,6 +54,7 @@ class PlanConfig:
     move_swap: bool = True
     move_swap_rounds: int = 3
     congestion_aware: bool = False   # 거리 중심(False) vs 혼잡 고려(True)
+    congestion_mode: str = "v2"      # 혼잡 고려 방식: v1(균등분배 합산)|v2(분산시작+사전순)
     improvement_eval_budget: int = 20000   # 작업당 평가 횟수 협력적 상한
     segdp_window: int = 6
     segdp_step: int = 3

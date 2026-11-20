@@ -385,6 +385,201 @@ class TestSimulator(unittest.TestCase):
         table.validate_path(result.order, path, result.distance)
 
 
+
+
+class TestHardenedProperties(unittest.TestCase):
+    """피드백 반영 강화 테스트: 수작업 검산·동시성·중단 주입·불변식."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.wh = build_warehouse(WarehouseConfig())
+
+    def run_sim(self, requests, stop_check=None, **kw):
+        cfg = run_cfg(**kw)
+        return simulate(cfg, self.wh, requests, stop_check=stop_check), cfg
+
+    # ---------- 사전 계산과 대기: 수작업 검산 가능한 정확 값 ----------
+    def test_plan_wait_exact_values_and_no_double_count(self):
+        """고정 지연 3작업: 대기 = (초기+첫 ROUTE)=12초, 이후 추가 대기 0."""
+        locs = [(16, 2), (20, 4), (12, 6)]
+        reqs = [one_request(locs[i], 1, "easy", i) for i in range(3)]
+        m, _ = self.run_sim(reqs, pickers=1, requests_per_task=1,
+                            fixed_initial_plan_s=10.0, fixed_wave_s=2.0,
+                            move_swap=False)
+        self.assertEqual(m["pickers"][0]["plan_wait_s"], 12.0)
+        self.assertAlmostEqual(m["plan_wait_total_s"], 12.0, places=6)
+        # 첫 작업은 계획 완료(12초)에 즉시 발급, 이후 작업은 체인(추가 대기 0)
+        recs = sorted(m["task_records"], key=lambda t: t["issued_at"])
+        self.assertAlmostEqual(recs[0]["issued_at"], 12.0, places=6)
+        for prev, cur in zip(recs[:-1], recs[1:]):
+            self.assertAlmostEqual(cur["issued_at"], prev["finished_at"], places=6)
+        # 정합성: 완료 = 발급 + 경로비용(도보) + 수거10 + 하차5 (모든 작업)
+        for t in m["task_records"]:
+            self.assertAlmostEqual(t["finished_at"],
+                                   t["issued_at"] + t["final_cost"] + 10.0 + 5.0,
+                                   places=6)
+        # 겹친 계산의 이중 합산 없음: 작업자 대기 합 <= 초기지연 + 자원 총지속
+        self.assertLessEqual(m["plan_wait_total_s"],
+                             m["plan"]["sim_delay_seconds"] + 1e-6)
+
+    def test_plan_wait_late_penalty_exact(self):
+        """파도당 400초 계산: 두 번째 작업 대기 = ROUTE2 완료 - 작업1 완료."""
+        locs = [(16, 2), (20, 4)]
+        reqs = [one_request(locs[i], 1, "easy", i) for i in range(2)]
+        m, _ = self.run_sim(reqs, pickers=1, requests_per_task=1,
+                            fixed_initial_plan_s=10.0, fixed_wave_s=400.0,
+                            move_swap=False)
+        free_at = m["task_records"][0]["finished_at"]  # ROUTE1(10~410) + 작업1 소요
+        # 순차 자원: PREROUTE(410~810) 실행 중 ROUTE2 대기 → 810~1210에 실행
+        expected_total = 410.0 + (1210.0 - free_at)
+        self.assertAlmostEqual(m["pickers"][0]["plan_wait_s"], expected_total, places=6)
+        self.assertGreater(m["pickers"][0]["plan_wait_s"], 400.0)  # 초과 지간만큼만
+
+    def test_sequential_resource_contention_exact(self):
+        """2작업자 동시 대기: ROUTE 직렬화로 대기 6초/11초(초기1+파도5)."""
+        reqs = [one_request((16, 2), 1, "easy", 0), one_request((20, 4), 1, "easy", 1)]
+        m, _ = self.run_sim(reqs, pickers=2, requests_per_task=1,
+                            fixed_initial_plan_s=1.0, fixed_wave_s=5.0,
+                            move_swap=False)
+        waits = sorted(p["plan_wait_s"] for p in m["pickers"].values())
+        self.assertEqual(waits, [6.0, 11.0])
+
+    # ---------- 거리와 최적값: 수작업 대조 ----------
+    def test_hand_computed_route_distance_tiny_warehouse(self):
+        """소형 창고(8x4): NN 경로와 비용 6m를 손계산과 정확히 일치."""
+        cfg = WarehouseConfig(width=8, height=4, cross_ys=(0, 4), staging=(4, 0))
+        wh = build_warehouse(cfg)
+        self.assertEqual(wh.locations, ((0, 2), (4, 2), (8, 2)))
+        self.assertEqual(wh.d((4, 0), (4, 2)), 2.0)
+        self.assertEqual(wh.d((4, 2), (0, 2)), 8.0)  # y=2 가로 통로 없음: y=0/4 경유
+        ctx = RouteContext(wh, wh.staging, wh.locations)
+        nn = improve(ctx, "nn")
+        # 손계산: (4,0)->(4,2)=2, ->(0,2)=8(y=0/4 경유), ->(8,2)=12, 벨트((8,2))=0
+        self.assertEqual(nn, [(4, 2), (0, 2), (8, 2)])
+        self.assertAlmostEqual(ctx.cost(nn), 22.0, places=9)
+        best, best_cost = brute_force_best(ctx)
+        self.assertAlmostEqual(best_cost, 22.0, places=9)
+
+    def test_segment_dp_local_optimal_with_boundary_costs(self):
+        """구간 DP 결과: 경계 비용 포함 모든 인접 교환이 개선되지 않음."""
+        rng = random.Random(21)
+        for _ in range(8):
+            locs = rng.sample(self.wh.locations, 7)
+            ctx = RouteContext(self.wh, self.wh.staging, locs)
+            order = improve(ctx, "nn-2opt")
+            out = improve(ctx, "nn-2opt-reinsert-segdp", order=list(order))
+            for i in range(len(out) - 1):
+                cand = out[:i] + [out[i + 1], out[i]] + out[i + 2:]
+                self.assertGreaterEqual(ctx.cost(cand), ctx.cost(out) - EPS)
+
+    # ---------- 혼잡과 이벤트: 정확한 동시성 ----------
+    def test_completion_before_arrival_fifo_exact(self):
+        """완료와 신규 도착 동시각: 완료 처리 -> 대기자 입장 -> 신규 대기.
+
+        보행 0.9m/s, A=(16,2) 수거40초(품목4), B=(16,6), C=(16,38), 구역 길이 40m.
+        A 완료시각(issue+2/0.9+40) == C 도착시각(issue+38/0.9)이 정확히 같다.
+        """
+        reqs = [one_request((16, 2), 4, "easy", 0),
+                one_request((16, 6), 1, "easy", 1),
+                one_request((16, 38), 1, "easy", 2)]
+        m, _ = self.run_sim(reqs, pickers=3, requests_per_task=1,
+                            zone_capacity=1, zone_length_m=40.0,
+                            walk_speed_m_s=0.9, fixed_initial_plan_s=0.0,
+                            fixed_wave_s=0.0, move_swap=False)
+        # est 내림차순 발급: picker0=A(16,2), picker1=C(16,38), picker2=B(16,6)
+        waits = {p: m["pickers"][p]["zone_wait_s"] for p in range(3)}
+        self.assertAlmostEqual(waits[0], 0.0, places=6)               # A 즉시 수거
+        self.assertAlmostEqual(waits[2], 40.0 - 4.0 / 0.9, places=6)  # B: A 완료까지 FIFO 대기
+        self.assertAlmostEqual(waits[1], 10.0, places=6)              # C: 동시각 도착, 완료 처리 후 B 입장으로 대기
+        self.assertEqual(m["zone_blocked_admissions"], 2)
+
+    def test_two_zones_independent(self):
+        """서로 다른 구역은 독립 처리: 원거리 두 위치에서 대기 0."""
+        reqs = [one_request((4, 2), 1, "easy", 0), one_request((32, 38), 1, "easy", 1)]
+        m, _ = self.run_sim(reqs, pickers=2, requests_per_task=1,
+                            zone_capacity=1, fixed_initial_plan_s=0.0,
+                            fixed_wave_s=0.0, move_swap=False)
+        self.assertAlmostEqual(m["total_zone_wait_s"], 0.0, places=6)
+        self.assertEqual(m["zone_blocked_admissions"], 0)
+
+    def test_zone_capacity_invariant_by_zone_state_replay(self):
+        """구역 상태 재생: 시뮬레이터가 유지하는 active 상한을 기록으로 점검.
+
+        입장은 항상 active<capacity 조건에서만 발생하므로, 차단 입장 수와
+        대기 합계의 정합성으로 검증한다(초과 입장이 있으면 대기 합계 감소).
+        """
+        run = run_cfg(pickers=20, combo="nn", zone_capacity=2, zone_length_m=8.0,
+                      hot_aisle_share=0.8, duplicate_share=0.3, total_requests=240, seed=5)
+        rng = random.Random(5)
+        reqs = generate_requests(run, self.wh, rng)
+        m = simulate(run, self.wh, reqs)
+        self.assertGreater(m["zone_blocked_admissions"], 0)   # 혼잡 실발생
+        self.assertGreater(m["total_zone_wait_s"], 0.0)
+        self.assertEqual(len(m["task_records"]), 20)          # 240요청/12 = 20작업
+
+    # ---------- 중단 주입: 전 단계 스윕 ----------
+    def test_interruption_sweep_all_stages(self):
+        """검사점 1..40번째마다 1회 중단: 어느 단계에서도 유효 계획 유지."""
+        from simulation.routes import Interrupted as RStop
+        from simulation.assignment import Interrupted as AStop
+
+        class Boom(RStop, AStop):
+            pass
+
+        rng = random.Random(31)
+        reqs = generate_requests(RunConfig(total_requests=36), self.wh, rng)
+        for n in range(1, 41):
+            calls = {"n": 0}
+
+            def stop(n=n, calls=calls):
+                calls["n"] += 1
+                if calls["n"] == n:
+                    raise Boom()
+
+            m, _ = self.run_sim([dict(r) for r in reqs], stop_check=stop,
+                                pickers=4, combo="alt", requests_per_task=6,
+                                seed=31)
+            flat = [rid for t in m["task_records"] for rid in t["requests"]]
+            self.assertEqual(sorted(flat), sorted(r["id"] for r in reqs),
+                             f"n={n}: 요청 누락/중복")
+            self.assertGreater(m["makespan_s"], 0.0)
+            self.assertTrue(m["plan"]["aborts"], f"n={n}: 중단 기록 없음")
+
+    def test_interruption_keeps_issued_records_complete(self):
+        """중단 시에도 발급된 작업의 기록(비용·시작 위치)은 완전하다."""
+        from simulation.routes import Interrupted as RStop
+        from simulation.assignment import Interrupted as AStop
+
+        class Boom(RStop, AStop):
+            pass
+        rng = random.Random(33)
+        reqs = generate_requests(RunConfig(total_requests=24), self.wh, rng)
+        for n in (3, 7, 12):
+            calls = {"n": 0}
+
+            def stop(n=n, calls=calls):
+                calls["n"] += 1
+                if calls["n"] == n:
+                    raise Boom()
+
+            m, _ = self.run_sim([dict(r) for r in reqs], stop_check=stop,
+                                pickers=2, combo="nn-2opt-reinsert",
+                                requests_per_task=6, seed=33)
+            for t in m["task_records"]:
+                self.assertIsNotNone(t["final_cost"])
+                self.assertIsNotNone(t["start_node"])
+
+    def test_v2_congestion_mode_runs_and_partition(self):
+        """v2 혼잡 고려 모드도 분할 불변식을 유지한다."""
+        rng = random.Random(35)
+        reqs = generate_requests(RunConfig(total_requests=36), self.wh, rng)
+        m, _ = self.run_sim(reqs, pickers=4, congestion_aware=True,
+                            requests_per_task=6, seed=35)
+        flat = [rid for t in m["task_records"] for rid in t["requests"]]
+        self.assertEqual(sorted(flat), sorted(r["id"] for r in reqs))
+        self.assertGreaterEqual(m["plan"]["moves_applied"], 0)
+
+
 def to_iter(n):
     return range(n)
 

@@ -81,8 +81,8 @@ class Planner:
         self.wall_total += wall
         return result, wall
 
-    def initial_plan(self, requests):
-        """전체 요청 → (작업들, 그룹, 소요). 거리 청크 → (선택) 균형 → (선택) 이동·교환."""
+    def initial_plan(self, requests, stop_check=None, log=None):
+        """전체 요청 → (작업들, 소요). 거리 청크 → (선택) 균형 → (선택) 이동·교환."""
         plan_cfg = self.run.plan
         pick_cfg = self.run.pick
         staging = self.warehouse.staging
@@ -94,7 +94,8 @@ class Planner:
                 groups = rebalance_chunks(groups, self.warehouse, staging, pick_cfg,
                                           speed, plan_cfg)
             if plan_cfg.move_swap:
-                groups = improve_assignment(groups, self.warehouse, staging, self.run)
+                groups = improve_assignment(groups, self.warehouse, staging, self.run,
+                                            stop_check=stop_check, log=log)
             return groups
 
         groups, wall = self._timed(compute)
@@ -114,7 +115,7 @@ class Planner:
             t.tid = i
         return tasks, duration
 
-    def route_for(self, task, start_node):
+    def route_for(self, task, start_node, stop_check=None):
         """발급용 경로 계산: 조합 적용 + NN 기준 비용. (route, nn_cost, cost, duration)"""
         plan_cfg = self.run.plan
         locations = task.locations
@@ -124,7 +125,8 @@ class Planner:
             order = improve_route(ctx, plan_cfg.route_combo,
                                   budget=plan_cfg.improvement_eval_budget,
                                   segdp_window=plan_cfg.segdp_window,
-                                  segdp_step=plan_cfg.segdp_step)
+                                  segdp_step=plan_cfg.segdp_step,
+                                  stop_check=stop_check)
             nn = improve_route(ctx, "nn")  # 기록용 NN 기준(같은 측정 구간에 포함)
             return ctx, order, ctx.cost(nn), ctx.cost(order)
 
@@ -134,9 +136,10 @@ class Planner:
         self.ops_count += 1
         return order, nn_cost, cost, duration
 
-    def improve_groups(self, groups):
+    def improve_groups(self, groups, stop_check=None, log=None):
         """발급 전 이동·교환(혼잡 고려 옵션). 지속시간은 호출자가 계산."""
-        return improve_assignment(groups, self.warehouse, self.warehouse.staging, self.run)
+        return improve_assignment(groups, self.warehouse, self.warehouse.staging,
+                                  self.run, stop_check=stop_check, log=log)
 
     def fixed_improve_duration(self):
         return self.run.sim.fixed_wave_s

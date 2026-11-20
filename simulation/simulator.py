@@ -19,7 +19,7 @@ from .assignment import Interrupted as AssignInterrupted
 from .assignment import task_estimate
 from .planner import PlanState, Planner, TaskPlan
 from .routes import Interrupted as RouteInterrupted
-from .routes import RouteContext
+from .routes import RouteContext, nn_order
 from .warehouse import zone_of
 
 PRIO_DONE, PRIO_ARRIVE, PRIO_PLAN = 0, 1, 2
@@ -78,6 +78,8 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner, stop_check=None)
             raise
     improve_rounds_left = run_cfg.plan.move_swap_rounds if run_cfg.plan.move_swap else 0
     improve_inflight = [False]
+    lookahead_stats = {"decisions": 0, "nondefault": 0, "pred_m": [], "actual_m": [],
+                       "wall_seconds": 0.0}
 
     def enqueue_op(prio, op):
         op_seq[0] += 1
@@ -154,10 +156,47 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner, stop_check=None)
         task.pred_finish = now + route_cost / speed + pick_seconds_of(task) + pick_cfg.unload_seconds
         task_meta[task.tid] = {"nn_cost": nn_cost, "cost": route_cost,
                                "issued_at": now, "start_node": p["node"]}
+        la = p.pop("la_pred", None)
+        if la is not None and la[0] == tuple(task.locations):
+            lookahead_stats["pred_m"].append(la[1])
+            lookahead_stats["actual_m"].append(route_cost)
         if route:
             _walk_to(p, route[0], now, "pick_arrive")
         else:
-            _walk_to(p, warehouse.belt_node(p["node"]), now, "belt_arrive")
+            _walk_to(p, choose_belt(p["node"], picker_id), now, "belt_arrive")
+
+    def choose_belt(last_node, picker_id):
+        """하차 지점 선택. 기본=최근접 접근(정책不变).
+
+        dropoff_lookahead=True(확장 후보)면 미발급 다음 작업(pending 선두)의
+        NN 비용을 후보 접근 지점별로 계산해 (현재 하차거리 + 다음 작업 추정)을
+        최소화한다. 계획 시점 정보만 사용하며 다음 작업이 없으면 기본 정책.
+        """
+        default = warehouse.belt_node(last_node)
+        if not run_cfg.plan.dropoff_lookahead:
+            return default
+        open_tasks = [t for t in state.tasks if t.status in ("pending", "prerouted")]
+        if not open_tasks:
+            return default
+        nxt = open_tasks[0]
+        if not nxt.locations:
+            return default
+        t_w = time.perf_counter()
+        dist = warehouse.distances_from(last_node)
+        cands = sorted(warehouse.access_nodes, key=lambda a: (dist[a], a))
+        cands = cands[:max(1, run_cfg.plan.lookahead_candidates)]
+        best, best_total = default, None
+        for a in cands:
+            ctx = RouteContext(warehouse, a, nxt.locations)
+            total = dist[a] + ctx.cost(nn_order(ctx))
+            if best_total is None or total < best_total - 1e-9:
+                best, best_total = a, total
+        lookahead_stats["decisions"] += 1
+        if best != default:
+            lookahead_stats["nondefault"] += 1
+        lookahead_stats["wall_seconds"] += time.perf_counter() - t_w
+        pickers[picker_id]["la_pred"] = (tuple(nxt.locations), best_total)
+        return best
 
     def preroute_next(just_issued, now):
         open_tasks = candidates()
@@ -339,7 +378,7 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner, stop_check=None)
             if p["route_pos"] < len(task.route):
                 _walk_to(p, task.route[p["route_pos"]], now, "pick_arrive")
             else:
-                _walk_to(p, warehouse.belt_node(node), now, "belt_arrive")
+                _walk_to(p, choose_belt(node, p["id"]), now, "belt_arrive")
         elif kind == "belt_arrive":
             p = pickers[payload]
             task = p["task"]
@@ -395,6 +434,12 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner, stop_check=None)
                  "improve_discarded": plan_stats["improve_discarded"],
                  "aborts": plan_stats["aborts"],
                  "adoption_log": adoption_log},
+        "lookahead": {"decisions": lookahead_stats["decisions"],
+                      "nondefault": lookahead_stats["nondefault"],
+                      "wall_seconds": round(lookahead_stats["wall_seconds"], 6),
+                      "matched": len(lookahead_stats["pred_m"]),
+                      "mean_pred_m": round(sum(lookahead_stats["pred_m"]) / len(lookahead_stats["pred_m"]), 3) if lookahead_stats["pred_m"] else None,
+                      "mean_actual_m": round(sum(lookahead_stats["actual_m"]) / len(lookahead_stats["actual_m"]), 3) if lookahead_stats["actual_m"] else None},
         "prediction_mae_s": round(sum(pred_errors) / len(pred_errors), 6) if pred_errors else None,
         "prediction_tasks": len(pred_errors),
         "edge_overlap_pairs": _count_overlaps(edge_log),

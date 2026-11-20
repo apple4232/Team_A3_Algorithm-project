@@ -35,6 +35,38 @@ def chunk_requests(requests, plan_cfg):
     return chunks
 
 
+def roundrobin_chunks(requests, plan_cfg, staging):
+    """단순 기준 배정: 집결지 거리 -> 좌표 정렬 후 K개 작업에 번갈아 배분.
+
+    근접 묶음 없이 고르게 나누는 약한 기준(비교용). 처리 순서는
+    (집결지 통로거리 근사, x, y, id) 정렬, 동률은 정렬 순서, 상한은
+    작업별 요청 수/수량을 존중한다.
+    """
+    import math
+    ordered = sorted(requests, key=lambda r: (abs(r["location"][0] - staging[0])
+                                              + abs(r["location"][1] - staging[1]),
+                                              r["location"][0], r["location"][1], r["id"]))
+    n_tasks = max(1, math.ceil(len(ordered) / max(1, plan_cfg.requests_per_task)))
+    chunks = [[] for _ in range(n_tasks)]
+    qty = [0] * n_tasks
+    slot = 0
+    for r in ordered:
+        placed = False
+        for _ in range(n_tasks):
+            i = slot % n_tasks
+            slot += 1
+            cap_qty = plan_cfg.quantity_per_task
+            if len(chunks[i]) + 1 <= plan_cfg.requests_per_task and                     (not cap_qty or qty[i] + r["qty"] <= cap_qty):
+                chunks[i].append(r)
+                qty[i] += r["qty"]
+                placed = True
+                break
+        if not placed:  # 모든 슬롯 포화(수량 상한 혼합) -> 추가 작업
+            chunks.append([r])
+            qty.append(r["qty"])
+    return [c for c in chunks if c]
+
+
 def pick_seconds(group, pick_cfg):
     total = 0.0
     for r in group:
@@ -210,6 +242,7 @@ def improve_assignment(groups, warehouse, staging, run_cfg, round_budget=None,
     speed = pick_cfg.walk_speed_m_s
     n_pickers = run_cfg.sim.pickers
     mode = getattr(plan_cfg, "congestion_mode", "v2") if plan_cfg.congestion_aware else "off"
+    threshold = getattr(plan_cfg, "congestion_threshold_s", 30.0)
     groups = [list(g) for g in groups]
     if not groups:
         return groups
@@ -230,6 +263,11 @@ def improve_assignment(groups, warehouse, staging, run_cfg, round_budget=None,
         times = [p["time_s"] for p in pr]
         if mode == "off":
             return (max(times),)
+        if mode == "auto":
+            # 계획 시점 예상 대기가 임계 미만이면 혼잡 고려를 적용하지 않는다.
+            starts0 = staggered_starts_from(times, n_pickers)
+            if _wait_from_profiles(pr, starts0, pick_cfg.zone_capacity) < threshold:
+                return (max(times),)
         if mode == "v1":
             extra = congestion_wait_estimate(gs, warehouse, staging, pick_cfg,
                                              speed, pick_cfg.zone_capacity)

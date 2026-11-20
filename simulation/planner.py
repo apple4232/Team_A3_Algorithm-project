@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass, field
 
 from .assignment import (chunk_requests, improve_assignment, rebalance_chunks,
-                         task_estimate)
+                         roundrobin_chunks, task_estimate)
 from .routes import RouteContext, improve as improve_route
 
 VALID_STATUSES = ("pending", "prerouted", "reserved", "issued", "done")
@@ -89,7 +89,10 @@ class Planner:
         speed = pick_cfg.walk_speed_m_s
 
         def compute():
-            groups = chunk_requests(requests, plan_cfg)
+            if plan_cfg.assignment == "roundrobin":
+                groups = roundrobin_chunks(requests, plan_cfg, staging)
+            else:
+                groups = chunk_requests(requests, plan_cfg)
             if plan_cfg.assignment == "balanced":
                 groups = rebalance_chunks(groups, self.warehouse, staging, pick_cfg,
                                           speed, plan_cfg)

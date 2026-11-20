@@ -50,11 +50,14 @@ class PlanConfig:
     requests_per_task: int = 12      # 작업당 요청 수 상한(연속 작업 유발)
     quantity_per_task: int | None = None
     route_combo: str = "nn"          # nn|nn-2opt|nn-reinsert|nn-2opt-reinsert|nn-reinsert-2opt|alt|nn-2opt-reinsert-segdp
-    assignment: str = "spatial"      # spatial(거리 중심)|balanced(작업량 균형)
+    assignment: str = "spatial"      # roundrobin(단순)|spatial(거리 중심)|balanced(작업량 균형)
     move_swap: bool = True
     move_swap_rounds: int = 3
     congestion_aware: bool = False   # 거리 중심(False) vs 혼잡 고려(True)
-    congestion_mode: str = "v2"      # 혼잡 고려 방식: v1(균등분배 합산)|v2(분산시작+사전순)
+    congestion_mode: str = "v2"      # v1|v2|auto(예상 대기가 임계 이상일 때만 v2)
+    congestion_threshold_s: float = 30.0  # auto 판정 임계(개발 데이터로 고정 후 동결)
+    dropoff_lookahead: bool = False  # 기본 정책=최근접 하차. True=1단계 선행 평가(확장 후보)
+    lookahead_candidates: int = 4    # 선행 평가에서 검토하는 벨트 접근 후보 수
     improvement_eval_budget: int = 20000   # 작업당 평가 횟수 협력적 상한
     segdp_window: int = 6
     segdp_step: int = 3

@@ -28,6 +28,10 @@ def make_run(args) -> RunConfig:
     plan = PlanConfig(route_combo=args.combo, assignment=args.assignment,
                       move_swap=not args.no_move_swap,
                       congestion_aware=args.congestion_aware,
+                      congestion_mode=args.congestion_mode,
+                      congestion_threshold_s=args.congestion_threshold_s,
+                      dropoff_lookahead=args.dropoff_lookahead,
+                      lookahead_candidates=args.lookahead_candidates,
                       requests_per_task=args.requests_per_task)
     sim = SimConfig(pickers=args.pickers, seed=args.seed, compute_mode=args.compute_mode)
     pick = PickConfig()
@@ -104,6 +108,8 @@ def experiment_main(out_dir: str, dev_seeds, eval_seeds, pickers=(1, 10, 20),
 def make_run_args(**kw):
     args = argparse.Namespace(pickers=10, combo="nn", assignment="spatial",
                               no_move_swap=False, congestion_aware=False,
+                              congestion_mode="v2", congestion_threshold_s=30.0,
+                              dropoff_lookahead=False, lookahead_candidates=4,
                               requests_per_task=12, seed=1, compute_mode="measured",
                               requests=240, easy_ratio=None, zone_length=None,
                               zone_capacity=None, hot_aisle_share=0.0,
@@ -218,6 +224,10 @@ def main():
                     ("assignment", {"default": "spatial", "choices": ["spatial", "balanced"]}),
                     ("no_move_swap", {"action": "store_true"}),
                     ("congestion_aware", {"action": "store_true"}),
+                    ("congestion_mode", {"default": "v2"}),
+                    ("congestion_threshold_s", {"type": float, "default": 30.0}),
+                    ("dropoff_lookahead", {"action": "store_true"}),
+                    ("lookahead_candidates", {"type": int, "default": 4}),
                     ("requests_per_task", {"type": int, "default": 12}),
                     ("seed", {"type": int, "default": 1}),
                     ("compute_mode", {"default": "measured", "choices": ["measured", "fixed"]}),

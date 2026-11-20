@@ -34,7 +34,9 @@ def run_cfg(**kw):
     plan = replace(base.plan, **{k: fields.pop(k) for k in list(fields) if k in
                                  ("route_combo", "assignment", "move_swap",
                                   "congestion_aware", "requests_per_task",
-                                  "improvement_eval_budget", "move_swap_rounds")})
+                                  "improvement_eval_budget", "move_swap_rounds",
+                                  "congestion_mode", "congestion_threshold_s",
+                                  "dropoff_lookahead", "lookahead_candidates")})
     sim = replace(base.sim, **{k: fields.pop(k) for k in list(fields) if k in
                                ("pickers", "seed", "compute_mode",
                                 "fixed_initial_plan_s", "fixed_wave_s")})
@@ -578,6 +580,90 @@ class TestHardenedProperties(unittest.TestCase):
         flat = [rid for t in m["task_records"] for rid in t["requests"]]
         self.assertEqual(sorted(flat), sorted(r["id"] for r in reqs))
         self.assertGreaterEqual(m["plan"]["moves_applied"], 0)
+
+
+
+
+class TestEvidenceFeatures(unittest.TestCase):
+    """입증 실험용 신규 기능: 단순 배정·선행 하차·혼잡 조건부."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.wh = build_warehouse(WarehouseConfig())
+
+    def run_sim(self, requests, **kw):
+        cfg = run_cfg(**kw)
+        return simulate(cfg, self.wh, requests), cfg
+
+    def test_roundrobin_partition_and_caps(self):
+        from simulation.assignment import roundrobin_chunks
+        from simulation.config import PlanConfig
+        rng = random.Random(51)
+        reqs = generate_requests(RunConfig(total_requests=50), self.wh, rng)
+        out = roundrobin_chunks(reqs, PlanConfig(requests_per_task=12), self.wh.staging)
+        flat = [r["id"] for c in out for r in c]
+        self.assertEqual(sorted(flat), sorted(r["id"] for r in reqs))
+        for c in out:
+            self.assertLessEqual(len(c), 12)
+            self.assertTrue(c)
+        self.assertLessEqual(max(len(c) for c in out) - min(len(c) for c in out), 1)
+
+    def test_roundrobin_runs_end_to_end(self):
+        rng = random.Random(53)
+        reqs = generate_requests(RunConfig(total_requests=36), self.wh, rng)
+        m, _ = self.run_sim(reqs, pickers=4, assignment="roundrobin",
+                            combo="nn", requests_per_task=6, move_swap=False)
+        flat = [rid for t in m["task_records"] for rid in t["requests"]]
+        self.assertEqual(sorted(flat), sorted(r["id"] for r in reqs))
+
+    def test_lookahead_records_and_preserves_requests(self):
+        """선행 하차(확장 후보): 의사결정 기록, 전 요청 처리, 분할 불변 유지."""
+        rng = random.Random(55)
+        reqs = generate_requests(RunConfig(total_requests=48), self.wh, rng)
+        m, _ = self.run_sim(reqs, pickers=2, dropoff_lookahead=True,
+                            combo="nn-2opt-reinsert", requests_per_task=6,
+                            move_swap=False)
+        flat = [rid for t in m["task_records"] for rid in t["requests"]]
+        self.assertEqual(sorted(flat), sorted(r["id"] for r in reqs))
+        self.assertGreaterEqual(m["lookahead"]["decisions"], 1)
+        self.assertIsNotNone(m["lookahead"]["mean_pred_m"])
+
+    def test_lookahead_prefers_forward_belt_on_split_workload(self):
+        """좌측 집중 작업 후 우측 집중 작업: 선행 평가가 기본(최근접)과 다른
+        접근 지점을 고르는 사례가 발생하고 예측-실제 기록이 남는다."""
+        left = [(0, 6), (0, 10), (0, 14), (0, 18), (4, 6), (4, 10)]
+        right = [(36, 6), (36, 10), (36, 14), (36, 18), (32, 6), (32, 10)]
+        reqs = [one_request(loc, 1, "easy", i) for i, loc in enumerate(left + right)]
+        m_on, _ = self.run_sim([dict(r) for r in reqs], pickers=1,
+                               dropoff_lookahead=True, requests_per_task=6,
+                               combo="nn", move_swap=False)
+        self.assertGreaterEqual(m_on["lookahead"]["decisions"], 1)
+        # 체인 작업이 존재(2작업)하므로 예측이 다음 작업과 대응될 기회 존재
+        self.assertEqual(m_on["tasks_done"], 2)
+
+    def test_auto_congestion_equals_v2_at_zero_threshold(self):
+        """임계 0의 auto는 v2와 논리적으로 동일해야 한다(fixed 모드, 동일 seed)."""
+        rng = random.Random(57)
+        reqs = generate_requests(RunConfig(total_requests=24), self.wh, rng)
+        common = dict(pickers=4, congestion_aware=True, assignment="balanced",
+                      requests_per_task=6, combo="nn", move_swap=False)
+        m_auto, _ = self.run_sim([dict(r) for r in reqs], congestion_mode="auto",
+                                 congestion_threshold_s=0.0, **common)
+        m_v2, _ = self.run_sim([dict(r) for r in reqs], congestion_mode="v2", **common)
+        self.assertAlmostEqual(m_auto["makespan_s"], m_v2["makespan_s"], places=6)
+        self.assertAlmostEqual(m_auto["total_walk_m"], m_v2["total_walk_m"], places=6)
+
+    def test_auto_congestion_equals_off_at_huge_threshold(self):
+        rng = random.Random(59)
+        reqs = generate_requests(RunConfig(total_requests=24), self.wh, rng)
+        common = dict(pickers=4, congestion_aware=True, assignment="balanced",
+                      requests_per_task=6, combo="nn", move_swap=False)
+        m_auto, _ = self.run_sim([dict(r) for r in reqs], congestion_mode="auto",
+                                 congestion_threshold_s=1e9, **common)
+        m_off, _ = self.run_sim([dict(r) for r in reqs], congestion_aware=False,
+                                assignment="balanced", requests_per_task=6,
+                                combo="nn", move_swap=False)
+        self.assertAlmostEqual(m_auto["makespan_s"], m_off["makespan_s"], places=6)
 
 
 def to_iter(n):

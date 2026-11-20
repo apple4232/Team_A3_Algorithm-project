@@ -1,0 +1,57 @@
+{
+  "nn+2opt": {
+    "attempts": 1350,
+    "completed": 1350,
+    "budget_exceeded": 0,
+    "mean_distance_m": 228.31703703703704,
+    "median_total_ms": 2.471208499628119,
+    "p95_total_ms": 7.734667000477202
+  },
+  "nn+2opt+reinsert": {
+    "attempts": 1350,
+    "completed": 1350,
+    "budget_exceeded": 0,
+    "mean_distance_m": 227.11111111111111,
+    "median_total_ms": 2.7117915014969185,
+    "p95_total_ms": 9.092625012272038
+  },
+  "nn+2opt+reinsert-twice": {
+    "attempts": 1350,
+    "completed": 1350,
+    "budget_exceeded": 0,
+    "mean_distance_m": 227.04296296296297,
+    "median_total_ms": 2.9211255023255944,
+    "p95_total_ms": 10.451875001308508
+  },
+  "nn+2opt+reinsert+segment-dp": {
+    "attempts": 1350,
+    "completed": 1350,
+    "budget_exceeded": 0,
+    "mean_distance_m": 226.63703703703703,
+    "median_total_ms": 3.436375001911074,
+    "p95_total_ms": 11.255499994149432
+  },
+  "two_stage_vs_two_reinsertions": {
+    "paired_completed_tasks": 1350,
+    "seed_groups": 30,
+    "mean_saving_m": 0.4059259259259259,
+    "ci95_seed_bootstrap_m": [
+      0.2903703703703704,
+      0.5274074074074074
+    ]
+  },
+  "environment": {
+    "python": "3.13.5",
+    "platform": "macOS-27.2.1-arm64-arm-64bit-Mach-O",
+    "source_sha256": "02e2326e4c0932d691824d5fc6e0d9706c793b08c00f0a903f09be182036ffd5",
+    "seeds": [
+      3000,
+      3029
+    ],
+    "window": 6,
+    "stride": 3,
+    "passes": 1,
+    "budget_seconds": 0.2,
+    "timing": "full run_request including reconstruction and validation"
+  }
+}

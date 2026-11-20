@@ -10,7 +10,8 @@ from .distances import DeadlineExceeded, DistanceTable, check_deadline
 from .graph import InputError, Node
 
 BASE_ALGORITHMS = ("given", "nn", "exhaustive", "dp", "ca-plus", "ca-minus")
-ALGORITHMS = BASE_ALGORITHMS + ("nn+2opt", "ca-plus+2opt", "ca-minus+2opt")
+IMPROVEMENT_ALGORITHMS = ("nn+2opt+reinsert", "nn+2opt+reinsert-twice", "nn+2opt+reinsert+segment-dp")
+ALGORITHMS = IMPROVEMENT_ALGORITHMS + BASE_ALGORITHMS + ("nn+2opt", "ca-plus+2opt", "ca-minus+2opt")
 
 
 @dataclass(frozen=True)
@@ -178,6 +179,62 @@ def two_opt(table: DistanceTable, initial: AlgorithmResult, *,
                    initial_settings=initial.details)
 
 
+
+def improve_route(table: DistanceTable, initial: AlgorithmResult, algorithm: str,
+                  limits: Limits, deadline: float | None) -> AlgorithmResult:
+    """확보한 경로를 보존하며 재삽입 후 재삽입 또는 6점 DP를 한 번 적용한다."""
+    order = list(table.validate_order(initial.order))
+    initial_distance = distance = table.route_distance(order)
+    accepted = 0
+    phases = ("reinsert",)
+    if algorithm == "nn+2opt+reinsert-twice":
+        phases += ("reinsert",)
+    elif algorithm == "nn+2opt+reinsert+segment-dp":
+        phases += ("segment-dp",)
+    status, termination = "completed", "single_pass"
+    try:
+        for phase in phases:
+            positions = tuple(order) if phase == "reinsert" else sorted(
+                set(range(0, max(1, len(order) - 5), 3)) | {max(0, len(order) - 6)})
+            for position in positions:
+                check_deadline(deadline)
+                if phase == "reinsert":
+                    i = order.index(position)
+                    rest = order[:i] + order[i + 1:]
+                    before = table.task.start if i == 0 else order[i - 1]
+                    after = table.task.conveyor if i + 1 == len(order) else order[i + 1]
+                    removal = table.d(before, position) + table.d(position, after) - table.d(before, after)
+                    best_delta, candidate = 0.0, order
+                    for j in range(len(rest) + 1):
+                        check_deadline(deadline)
+                        left = table.task.start if j == 0 else rest[j - 1]
+                        right = table.task.conveyor if j == len(rest) else rest[j]
+                        delta = table.d(left, position) + table.d(position, right) - table.d(left, right) - removal
+                        if delta < best_delta - 1e-9:
+                            best_delta = delta
+                            candidate = rest[:j] + [position] + rest[j:]
+                else:
+                    end = min(position + 6, len(order))
+                    left = table.task.start if position == 0 else order[position - 1]
+                    right = table.task.conveyor if end == len(order) else order[end]
+                    local = replace(table, task=replace(table.task, start=left,
+                                    conveyor=right, required=tuple(order[position:end])))
+                    exact = _subset_dp(local, limits, deadline)
+                    if exact.order is None:
+                        termination = "segment_resource_limit"
+                        continue
+                    candidate = order[:position] + list(exact.order) + order[end:]
+                candidate_distance = table.route_distance(candidate)
+                if candidate_distance < distance - 1e-9:
+                    order, distance = candidate, candidate_distance
+                    accepted += 1
+        check_deadline(deadline)
+    except DeadlineExceeded:
+        status, termination = "timeout", "deadline"
+    return _result(table, algorithm, tuple(order), status=status, termination=termination,
+                   initial_distance=initial_distance, accepted_moves=accepted)
+
+
 def solve(table: DistanceTable, algorithm: str, *, coefficient: float = 1.0,
           limits: Limits | None = None, deadline: float | None = None) -> AlgorithmResult:
     """후보 하나만 실행한다. 대체 경로 반환은 run_request가 별도로 기록한다."""
@@ -194,7 +251,12 @@ def solve(table: DistanceTable, algorithm: str, *, coefficient: float = 1.0,
     result = None
     try:
         check_deadline(deadline)
-        if base == "exhaustive" and n > limits.exhaustive_n:
+        if algorithm in IMPROVEMENT_ALGORITHMS:
+            initial = solve(table, "nn+2opt", limits=limits, deadline=deadline)
+            result = initial
+            if initial.order is not None and initial.status == "completed":
+                result = improve_route(table, initial, algorithm, limits, deadline)
+        elif base == "exhaustive" and n > limits.exhaustive_n:
             result = _result(table, base, None, status="resource_limit", termination="exhaustive_size")
         elif base == "dp" and n > limits.dp_n:
             result = _result(table, base, None, status="resource_limit", termination="dp_size")

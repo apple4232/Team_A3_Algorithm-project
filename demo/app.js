@@ -1,11 +1,18 @@
 'use strict';
 const $ = id => document.getElementById(id);
-const algorithms = ['given','nn','exhaustive','dp','ca-plus','ca-minus','nn+2opt','ca-plus+2opt','ca-minus+2opt'];
+const algorithms = ['given','nn','exhaustive','dp','ca-plus','ca-minus','nn+2opt','ca-plus+2opt','ca-minus+2opt','nn+2opt+reinsert','nn+2opt+reinsert-twice','nn+2opt+reinsert+segment-dp'];
 const labels = {'given':'입력 순서','nn':'NN','exhaustive':'완전 탐색','dp':'DP','ca-plus':'CA-plus','ca-minus':'CA-minus','nn+2opt':'NN + 2-opt','ca-plus+2opt':'CA-plus + 2-opt','ca-minus+2opt':'CA-minus + 2-opt'};
+Object.assign(labels, {
+ 'nn+2opt+reinsert':'한 곳씩 순서 개선',
+ 'nn+2opt+reinsert-twice':'한 곳씩 순서 개선 · 2회',
+ 'nn+2opt+reinsert+segment-dp':'제안 알고리즘 · 한 곳씩 → 6곳 묶음 순서 개선'
+});
 const patterns = {'clustered':'군집형','random-stow-like':'Random-Stow-like','directional':'방향형','paired-far':'반사 쌍 · 원거리','paired-near':'반사 쌍 · 근거리'};
 const statuses = {'completed':'완료','timeout':'시간 초과','resource_limit':'자원 제한','error':'오류','invalid_input':'입력 오류','infeasible':'경로 없음'};
 const terms = {'completed':'완료','local_optimum':'지역 최적점','evaluation_limit':'평가 횟수 제한','deadline':'시간 제한','dp_size':'DP 위치 수 제한','exhaustive_size':'완전 탐색 위치 수 제한','dp_memory_estimate':'DP 메모리 추정 제한','allocation_failed':'메모리 할당 실패'};
+Object.assign(terms, {'single_pass':'한 번 순회 완료','segment_resource_limit':'구간 DP 자원 제한'});
 const scenarios = {
+ I:['제안 알고리즘','같은 초기 경로에서 ‘한 곳씩 순서 개선 · 2회’와 우리가 제안한 ‘한 곳씩 → 6곳 묶음 순서 개선’을 비교합니다. 경로 재계산 버튼을 눌러 실행하세요.',20,'random-stow-like','nn+2opt+reinsert-twice','nn+2opt+reinsert+segment-dp'],
  A:['정확성','작은 작업에서 완전 탐색과 DP의 결과를 비교합니다.',3,'clustered','exhaustive','dp'],
  B:['계산 규모','위치 수에 따라 DP의 시간과 완료 상태를 확인합니다.',15,'random-stow-like','dp','nn+2opt'],
  C:['큰 작업','큰 작업에서 빠른 방법들의 경로와 비용을 비교합니다.',50,'random-stow-like','nn','nn+2opt'],
@@ -40,6 +47,7 @@ async function aggregate() {
 }
 function setScenario(key) {
  scenario=key; const s=scenarios[key];
+ if(key==='I') $('mode').value='request';
  for(const button of $('scenarios').children) { const active=button.dataset.key===key; button.classList.toggle('active',active); button.setAttribute('aria-pressed',String(active)); }
  $('scenario-description').textContent=s[1]; $('n').value=String(s[2]); $('pattern').value=s[3]; $('start').value='0'; $('algorithm-a').value=s[4]; $('algorithm-b').value=s[5];
  live=null; updateTaskOptions(); aggregate();
@@ -100,7 +108,18 @@ function renderTable(detail) {
  const f=detail.features; $('task-info').textContent=`${detail.task.id} · ${f.n}개 위치 · 분산 ${fmt(f.dispersion,1)} m · 출발점 평균 ${fmt(f.start_mean,1)} m · 도착점 평균 ${fmt(f.conveyor_mean,1)} m`;
  const rule=detail.rules.count; const chosen=rule.algorithm || (f[rule.feature] <= rule.threshold?rule.left:rule.right); $('rule').textContent=`저장된 개수 기반 선택 규칙: ${rule.feature || '고정'} ${rule.threshold == null?'':`≤ ${rule.threshold}`} → ${labels[rule.left]||rule.algorithm}, 그 외 → ${labels[rule.right]||rule.algorithm}. 이 작업의 선택: ${labels[chosen]}. 규칙은 개발 데이터에서 정해졌습니다.`;
 }
+function renderAlgorithmExplanation() {
+ const descriptions = {
+  'nn+2opt+reinsert':'NN + 2-opt로 만든 경로에서 선반 하나씩 방문 순서를 바꿉니다. 예를 들어 8번째 선반을 3번째로 옮겨 봅니다. 다른 모든 삽입 지점을 비교하고, 전체 거리가 가장 짧아지는 순서를 채택합니다. 초기 순서의 각 선반을 한 번씩 검사합니다.',
+  'nn+2opt+reinsert-twice':'NN + 2-opt 경로에 ‘한 곳씩 순서 개선’을 두 번 적용합니다. 선반 하나를 다른 모든 방문 순서 자리에 넣어 보고, 전체 거리가 줄어드는 경우에만 옮깁니다. 첫 번째 순회에서 바뀐 경로를 두 번째 순회에서 다시 개선합니다.',
+  'nn+2opt+reinsert+segment-dp':'NN + 2-opt 경로에 먼저 ‘한 곳씩 순서 개선’을 적용합니다. 이어서 연속한 여섯 선반의 앞뒤 경계를 고정하고, 여섯 곳의 방문 순서를 정확 DP로 다시 계산합니다. 묶음을 세 칸씩 옮기며 한 번 훑고 마지막 묶음도 포함합니다. 여섯 곳 이하면 전체를 한 묶음으로 계산합니다. 전체 거리가 줄어들 때만 변경합니다.'
+ };
+ const selected = [...new Set(['algorithm-a','algorithm-b'].map(id=>$(id).value))].filter(name=>descriptions[name]);
+ $('algorithm-explanation').hidden = selected.length === 0;
+ $('algorithm-explanation-content').innerHTML = selected.map(name=>`<h3>${escapeHtml(labels[name])}</h3><p>${escapeHtml(descriptions[name])}</p>`).join('');
+}
 function render() {
+ renderAlgorithmExplanation();
  if(!current)return; mapPaths=[];
  const pairedScenario=scenario==='F'||scenario==='H';
  const rightDetail=pairedScenario ? other : current;

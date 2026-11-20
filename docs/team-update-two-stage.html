@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>창고 피킹 데모 업데이트 · 제안 알고리즘</title>
+<style>
+  :root {color-scheme:light; --ink:#17302c; --muted:#52655e; --line:#d6e2d9; --accent:#246653; --tint:#eaf4ed}
+  * {box-sizing:border-box}
+  body {margin:0;background:#f4f6f1;color:var(--ink);font:16px/1.7 system-ui,sans-serif;word-break:keep-all;overflow-wrap:anywhere}
+  main {width:min(850px, calc(100% - 32px));margin:clamp(16px,5vw,64px) auto;background:white;border:1px solid var(--line);border-radius:18px;padding:clamp(20px,6vw,60px)}
+  header {border-bottom:1px solid var(--line);padding-bottom:25px}
+  h1,h2,h3,p {margin:0}
+  h1 {font-size:clamp(30px,5vw,48px);line-height:1.2;letter-spacing:-.055em;margin:8px 0 14px}
+  h2 {font-size:23px;line-height:1.35;margin-bottom:12px}
+  h3 {font-size:16px;margin-bottom:4px}
+  section {margin-top:30px}
+  p + p {margin-top:10px}
+  .project,.note {color:var(--muted);font-size:14px}
+  .steps {padding-left:23px;margin:12px 0}
+  .steps li {padding-left:5px;margin-bottom:12px}
+  .steps li::marker {color:var(--accent);font-weight:700}
+  .example {margin-top:12px;padding:12px 16px;background:var(--tint);border-left:3px solid var(--accent)}
+  .table {overflow-x:auto;margin:12px 0}
+  table {width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  th,td {padding:9px 11px;border-bottom:1px solid var(--line);text-align:right}
+  th:first-child,td:first-child {text-align:left}
+  th {font-size:14px;color:var(--muted)}
+  td:not(:first-child) {white-space:nowrap}
+  tbody tr:last-child {background:var(--tint);font-weight:700}
+  code {font-size:.92em;background:#eff3ef;padding:2px 5px;border-radius:4px}
+  @media print {body {background:white} main {width:100%;margin:0;padding:0;border:0} section,.table {break-inside:avoid}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="project">창고 피킹 경로 프로젝트 · 제안 알고리즘</p>
+    <h1>한 곳씩 → 6곳 묶음<br>순서 개선</h1>
+    <p>우리가 제안한 알고리즘은 선반이 많을 때 빠르게 만든 방문 경로를 두 단계로 다듬습니다. 선반 하나의 순서를 먼저 옮겨 보고, 이어서 연속한 여섯 곳의 순서를 함께 바꿉니다.</p>
+  </header>
+
+  <section>
+    <h2>경로는 어떻게 짧아지나요?</h2>
+    <p>방문할 선반이 많으면 모든 방문 순서를 비교하기 어렵습니다. 그래서 가까운 선반부터 방문하고 중간 구간을 뒤집어 거리를 줄이는 <strong>NN + 2-opt</strong>로 먼저 경로를 만든 뒤, 아래 두 단계를 적용합니다.</p>
+    <ol class="steps">
+      <li><h3>한 곳씩 순서 개선</h3>선반 하나를 빼서 다른 방문 순서에 넣어 봅니다. 전체 거리를 가장 많이 줄이는 자리가 있으면 그곳으로 옮깁니다. 이 과정이 재삽입입니다.</li>
+      <li><h3>6곳 묶음 순서 개선</h3>현재 순서에서 연속한 여섯 선반을 고릅니다. 묶음의 앞뒤 경계를 고정하고 여섯 곳을 가장 짧게 도는 순서를 계산합니다. 묶음을 세 자리씩 옮기며 반복합니다. 이 계산에 구간 DP를 사용합니다.</li>
+    </ol>
+    <p class="example"><strong>예를 들어</strong> 먼저 8번째 선반을 3번째에 들르면 더 짧아지는지 봅니다. 다음에는 3~8번째에 놓인 선반 여섯 곳의 순서를 함께 다시 짭니다. 두 단계 모두 전체 거리가 줄어드는 변경만 적용합니다.</p>
+  </section>
+
+  <section>
+    <h2>두 번째 단계가 도움이 됐나요?</h2>
+    <p>선반 15·20·50곳을 방문하는 합성 작업 1,350건을 비교했습니다. 재삽입을 두 번 수행한 경우를 함께 측정해, 두 번째에 여섯 곳을 함께 바꾸는 효과를 확인했습니다.</p>
+    <div class="table" role="region" aria-label="경로 거리와 처리 시간 비교" tabindex="0">
+      <table>
+        <thead><tr><th scope="col">방법</th><th scope="col">평균 거리</th><th scope="col">알고리즘 실행 시간 중앙값</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">기존 NN + 2-opt</th><td>228.32m</td><td>2.47ms</td></tr>
+          <tr><th scope="row">한 곳씩 순서 개선 · 2회</th><td>227.04m</td><td>2.92ms</td></tr>
+          <tr><th scope="row">제안 알고리즘 · 한 곳씩 → 6곳 묶음 순서 개선</th><td>226.64m</td><td>3.44ms</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>제안 방법은 기존 경로보다 평균 <strong>1.68m</strong>, 한 곳씩 두 번 고친 경로보다 평균 <strong>0.41m</strong> 짧았습니다. 60개 작업을 네 방법으로 10번씩 반복한 별도 측정에서도 2,400회 모두 200ms 안에 끝났습니다.</p>
+    <p class="note">실행 시간은 컴퓨터가 입력을 준비하고, 알고리즘을 돌려 경로를 계산하고, 그 경로를 복원·검증하는 데 걸린 시간입니다. 예를 들어 3.44ms는 전체 작업의 절반 정도가 3.44ms 이내에 처리됐다는 뜻입니다. 합성 창고 한 곳에서 측정했습니다.</p>
+  </section>
+
+  <section>
+    <h2>데모에서 직접 비교하기</h2>
+    <ol class="steps">
+      <li>프로젝트 폴더에서 <code>python3 -m demo --port 8766</code>을 실행하고 브라우저에서 <code>http://127.0.0.1:8766</code>을 엽니다.</li>
+      <li><strong>시나리오 I ‘제안 알고리즘’</strong>을 선택합니다. 두 방법이 자동으로 선택되고, 선택한 새 알고리즘의 설명이 나타납니다.</li>
+      <li><strong>‘선택한 경로 재계산’</strong>을 누른 뒤 지도와 이동 거리를 비교합니다. 기본 예시에서 재삽입 두 번은 <strong>248m</strong>, 제안 방법은 <strong>240m</strong>였습니다.</li>
+    </ol>
+  </section>
+</main>
+</body>
+</html>

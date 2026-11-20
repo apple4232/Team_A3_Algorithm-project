@@ -1,0 +1,30 @@
+{
+  "environment": {
+    "python": "3.13.5",
+    "platform": "macOS-27.2.1-arm64-arm-64bit-Mach-O"
+  },
+  "tasks": 60,
+  "repetitions": 10,
+  "methods": {
+    "nn+2opt": {
+      "median_ms": 2.4075415058177896,
+      "p95_ms": 7.5745000067399815,
+      "budget_exceeded": 0
+    },
+    "nn+2opt+reinsert": {
+      "median_ms": 2.6404585005366243,
+      "p95_ms": 8.954624994657934,
+      "budget_exceeded": 0
+    },
+    "nn+2opt+reinsert-twice": {
+      "median_ms": 2.8414579937816598,
+      "p95_ms": 10.146874992642552,
+      "budget_exceeded": 0
+    },
+    "nn+2opt+reinsert+segment-dp": {
+      "median_ms": 3.343270502227824,
+      "p95_ms": 11.127374993520789,
+      "budget_exceeded": 0
+    }
+  }
+}

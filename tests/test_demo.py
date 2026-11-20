@@ -75,6 +75,14 @@ class DemoTests(unittest.TestCase):
         finally:
             del self.data.tasks['large']
 
+    def test_new_improvements_can_be_recalculated(self):
+        names = ["nn+2opt+reinsert-twice", "nn+2opt+reinsert+segment-dp"]
+        rows = recalculate(self.data, {"id": self.task["id"], "algorithms": names})
+        self.assertEqual([row["algorithm"] for row in rows], names)
+        for row in rows:
+            self.assertEqual(row["status"], "completed")
+            self.assertIsNotNone(row["path"])
+
     def test_http_roundtrip_and_untrusted_origin(self):
         server = HTTPServer(('127.0.0.1', 0), make_handler(self.data))
         thread = threading.Thread(target=server.serve_forever, daemon=True)

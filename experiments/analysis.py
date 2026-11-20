@@ -39,6 +39,7 @@ def summarize(rows):
                  and not r["result"].get("budget_exceeded", False)]
         gaps, improvements, regrets, zero_differences, fixed_differences = [], [], [], [], []
         paired_groups = defaultdict(list)
+        reference_improvements, reference_over_budget = [], 0
         for row in valid:
             peers = by_task[row["task"]["id"]]
             distance = row["result"]["distance"]
@@ -50,9 +51,15 @@ def summarize(rows):
             elif optimum:
                 zero_differences.append(distance - min(optimum))
             nn = peers.get("nn", {}).get("result", {})
-            if nn.get("status") == "completed" and nn.get("distance"):
+            if nn.get("status") == "completed" and not nn.get("budget_exceeded", False) and nn.get("distance"):
                 improvements.append(100 * (nn["distance"] - distance) / nn["distance"])
                 paired_groups[row["task"]["group"]].append(nn["distance"] - distance)
+            # Request paths are validated by run_request before they are recorded.
+            if (nn.get("distance") and nn.get("returned_algorithm") == "nn"
+                    and nn.get("path") is not None and nn.get("order") is not None
+                    and nn.get("status") in ("completed", "timeout")):
+                reference_improvements.append(100 * (nn["distance"] - distance) / nn["distance"])
+                reference_over_budget += bool(nn.get("budget_exceeded") or nn["status"] == "timeout")
             fixed = peers.get("fixed", {}).get("result", {})
             if fixed.get("status") == "completed" and fixed.get("distance") is not None and not fixed.get("budget_exceeded", False):
                 fixed_differences.append(fixed["distance"] - distance)
@@ -68,6 +75,9 @@ def summarize(rows):
                         "mean_gap_percent": mean(gaps) if gaps else None, "gap_count": len(gaps),
                         "mean_nn_improvement_percent": mean(improvements) if improvements else None,
                         "nn_pair_count": len(improvements), "nn_paired_group_count": len(paired_groups),
+                        "nn_reference_mean_improvement_percent": mean(reference_improvements) if reference_improvements else None,
+                        "nn_reference_pair_count": len(reference_improvements),
+                        "nn_reference_over_budget_count": reference_over_budget,
                         "nn_paired_mean_difference_ci95_m": group_interval(paired_groups),
                         "zero_optimum_mean_difference_m": mean(zero_differences) if zero_differences else None,
                         "mean_difference_from_fixed_m": mean(fixed_differences) if fixed_differences else None,

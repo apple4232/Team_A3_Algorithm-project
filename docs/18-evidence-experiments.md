@@ -1,91 +1,89 @@
-# 18. 입증 실험 — 어떤 조합이 무엇을 얼마나 개선하는가
+# 18. Evidence Experiments: Which Combination Improved What?
 
-> **역사적 탐색 보고·정정 반영:** 확장 탐색은 종료하고 [전체 기록](20-expansion-study-record.md)에 보존했다. 아래 비교는 해당 합성 조건에서의 관측이다. 평가 seed는 이전·후속 단계에 재사용돼 프로젝트 전체의 새로운 독립 평가로 볼 수 없다. 개선 관측과 사전 계산 예산 충족은 별개이며, 예산 기준은 미충족이다.
+> **Historical exploratory report with corrections.** The expansion is closed and preserved in the [complete study record](20-expansion-study-record.md). These are synthetic-condition observations. Evaluation seed IDs were reused across stages, so this is not a fresh project-wide independent evaluation. Observed improvement and computation-budget compliance are separate; the budget criterion was not met.
 
-작성: 2026-11-21 · 브랜치 `multi-picker-evidence`(기준 `project-expansion` `340db77`,
-구현 커밋 `5b9ca79`) · 원자료 `results/multi3-dev/`(220실행), `results/multi3-eval/`(420실행)
-· 환경: Windows 10, Python 3.12.2, 표준 라이브러리만 사용 · seed: 개발 202~208(짝수 4),
-혼잡 스크린 210·212 추가, 평가 203~221(홀수 10, 후보 선택에 미사용) · 실행 순서 무작위화.
+Original report: November 21, 2026, branch `multi-picker-evidence`, based on `project-expansion` at `340db77`; implementation `5b9ca79`. Data: `results/multi3-dev/` (220 runs), `results/multi3-eval/` (420). Reported environment: Windows 10, Python 3.12.2, standard library. Development seeds: four even IDs 202-208, plus 210/212 for congestion screening. Evaluation: ten odd IDs 203-221, not used for that stage's candidate choice. Execution order was randomized.
 
-## 1. 성공 판정 기준(실험 전 고정)
+## 1. Predeclared success criteria
 
-- 실용 최소: 대상 조건(p=10, R=480, 기본 창고)에서 전체 집계 개선 **≥1.0% 且 ≥10s/실행**
-- 허용 악화: 조건별 평균 CI 하한 > −0.5%, 최대 단일 악화 ≤ 2%
-- 계산 예산: 실행당 계획 실측 ≤15s, 작업자 계획 대기 ≤ 종료시간 2%
-- 근거: 병목 분석(활용도 98%, 수거:이동 6.6:1)에서 측정 변동(±0.3%)보다 큰 최소 실용치.
+- Practical target: at p=10/R=480 in the default warehouse, aggregate improvement **at least 1.0% and 10 seconds per run**.
+- Deterioration tolerance: condition-specific CI lower bound above -0.5%; worst single deterioration at most 2%.
+- Computation: planning wall time at most 15 seconds per run; worker planning waiting at most 2% of makespan.
+- Rationale: bottleneck analysis suggested about 98% utilization and collection/travel ratio 6.6:1; 1% was selected as a practical threshold above the reported approximately 0.3% variation.
 
-## 2. 병목 분석 요약 (`simulation/bottleneck.py`, multi2 원자료 168 NN 실행)
+The worker-wait ratio sums time across workers and is not the fraction of elapsed makespan directly caused by planning. Randomized ordering alone does not validate the stated timing-variation estimate through repeated trials.
 
-- 종료시간 ≈ 최대 부하 작업자 + 초기 계획 지연 + 5~40s(분해오차). 활용도 95~99%
-  (p=20·R=240만 85%). 수거:이동 ≈ 6.6:1. 마지막 완료자는 수거 편중(이동 236s vs 수거 1454s).
-- 가설: 개선 상한은 이동 비중(≈14%)×거리 감소율 + 불균형 갭 → 1~2%(기본 창고),
-  이동 비중이 큰 조건에서 더 클 수 있다는 가설을 세웠다. 관련 조건에서 큰 개선이 관측됐지만 크기·요청량·밀도가 함께 바뀌어 인과적 확인은 아니다.
+## 2. Bottleneck analysis
 
-## 3. 기준·후보 정의와 성분 분해
+`simulation/bottleneck.py` examined 168 NN records from multi2. The report approximated completion as maximum worker load plus initial planning and a 5-40-second residual. Utilization was 95-99%, except p20/R240 at about 85%. Collection/travel was approximately 6.6:1; one last-finisher example had 236 seconds travel and 1,454 collection.
 
-기준 3종(동일 발급 규칙: 추정시간 내림차순 예약, FIFO 대기, 같은 창고·규칙):
-- **L0 rr**: 집결지 거리→좌표 정렬 후 K슬롯 round-robin(약한 기준, 근접 묶음 없음)
-- **L1 sp**(주 기준): (x,y) 정렬 연속 청크 cap12 — 현행 기본값
-- **L2 bal**: L1 청크를 추정시간 편차 축소로 재조정
+The proposed hypothesis was a 1-2% default-layout improvement opportunity based on travel share (about 14%), distance reduction and imbalance. Larger gains were observed in high-travel conditions, but layout, volume and density changed together; causal confirmation was not established.
 
-후보(사다리, 모두 같은 seed 쌍): L3=bal+n2r, L4=L3+이동·교환, L5=L4+혼잡 auto,
-L6=sp+n2r, **C1=cap24+sp+NN, C2=cap24+bal+NN, C3=cap24+bal+n2r(최종 제안)**.
+## 3. References, candidates and decomposition
 
-동결(개발 스크린 후, 평가 전): 제안=C3, ms·혼잡·lookahead 제외. 근거는 §5.
+References share estimated-duration-descending release, FIFO service and physical rules:
 
-## 4. 평가 집합 비교 결과 (eval 10 seed, 전체 집계식 = 주요 지표)
+- **L0 rr:** sort by staging distance and coordinates, then assign round-robin to K slots. This is a weak reference without spatial clustering.
+- **L1 sp:** coordinate-sorted consecutive chunks, cap12; primary reference.
+- **L2 bal:** adjust L1 chunks to reduce estimated-time dispersion.
 
-| 조건 | C3 vs L1 | CI95 | 초/실행 | 거리 |
+Ladder: L3=balanced+n2r; L4=L3+move/swap; L5=L4+auto congestion; L6=spatial+n2r. Here n2r means NN -> 2-opt -> reinsertion.
+
+Cap candidates: **C1=cap24+spatial+NN; C2=cap24+balanced+NN; C3=cap24+balanced+n2r**.
+
+C3 was frozen after development screening and before the recorded evaluation. Move/swap, congestion and lookahead are off for that candidate; see Section 5.
+
+## 4. Evaluation-set comparisons
+
+Ten evaluation seeds; the primary statistic is aggregate completion improvement.
+
+| Condition | C3 versus L1 | 95% interval | Seconds saved per run | Distance |
 |---|---|---|---|---|
-| 기본 창고 p=1, R=480 | **+6.11%** | [+5.87, +6.34] | **+1017.5s** | −923m |
-| 기본 창고 p=10, R=480 | **+3.84%** | [+3.32, +4.33] | **+64.7s** | −849m |
-| 기본 창고 p=20, R=480 | **−2.28%(악화)** | [−3.68, −0.80] | −19.8s | −982m |
-| 대형 20통로(76×80m) p=10, R=960 | **+10.94%** | [+10.23, +11.64] | +422.0s | 8601→4941m |
-| 대형+교차로 추가 p=10, R=960 | **+10.47%** | [+9.75, +11.21] | +400.5s | −43% |
-| 집중(hot 0.6·중복 0.2) p=10 | +3.67% | [+2.96, +4.32] | +61.2s | — |
-| 포장 70% p=10 | +3.63% | [+2.96, +4.37] | +66.0s | — |
-| 보행 0.7m/s p=10 | +6.55% | [+5.86, +7.23] | +117.9s | — |
+| Default p1, R480 | **+6.11%** | [5.87,6.34] | **1017.5** | -923 m |
+| Default p10, R480 | **+3.84%** | [3.32,4.33] | **64.7** | -849 m |
+| Default p20, R480 | **-2.28%** | [-3.68,-0.80] | -19.8 | -982 m |
+| Large, 20 aisles, 76 by 80 m, p10/R960 | **+10.94%** | [10.23,11.64] | 422.0 | 8601 to 4941 m |
+| Large plus additional cross aisles, p10/R960 | **+10.47%** | [9.75,11.21] | 400.5 | About -43% |
+| Hotspot 0.6, duplicates 0.2, p10 | +3.67% | [2.96,4.32] | 61.2 | Not listed |
+| Wrapped share 70%, p10 | +3.63% | [2.96,4.37] | 66.0 | Not listed |
+| Walking speed 0.7 m/s, p10 | +6.55% | [5.86,7.23] | 117.9 | Not listed |
 
-실행별 평균 산식도 전 조건에서 전체 집계식과 0.01~0.1%p 내 일치(원자료로 재계산 가능).
-성분 분해(p=10, 기본 창고, 각 단계는 공통 기준 L1 대비 개선율의 직전 단계 대비 증분):
-묶음 12→24(C1) = +3.807%p, 균형 배정(C2−C1) = −0.081%p, 경로 개선(C3−C2) = +0.112%p,
-합 = 최종 +3.839%와 일치. **이번 적용 순서(묶음→배정→경로)에서 묶음 확대가 대부분의
-개선을 설명했다**는 표현이 정확하며, 인과적 기여도 확정이 아니다(순서 민감: 배정 단계는
-cap12에서 −0.25%, cap24에서 −0.08%). p=1도 동일 구조(C1=+6.05).
-cap은 '요청 수' 상한이다 — cap24 작업의 실제 구성은 물품 수량 중앙값 32개,
-고유 방문 위치는 중앙 9개(최대 14). 바구니 용량이 모델에서 제외되어 있어
-"24개를 한 번에 운반 가능"은 현장 근거가 없는 모델 가정이다.
-cap12 사다리(L3/L4/L5)는 +0.1~0.4% 수준으로 CI가 0을 포함하거나 미세 — 묶음 크기가
-지배 요인이다. cap6은 −11.8%(dev)로 악화.
+The stage report found per-run mean percentages approximately 0.01-0.1 percentage points from aggregate values; raw data support separate recalculation.
 
-## 5. 탈락 근거 (개발 스크린, 문서화된 부정 결과)
+At p10/default, all ladder percentages use common baseline L1. Cap expansion C1 contributes a **+3.807 percentage-point difference**, C2-C1 is **-0.081**, and C3-C2 is **+0.112**. Their sum matches approximately +3.839%.
 
-- **이동·교환(ms)**: L4−L3 증분 −3.9~+0.8s(노이즈) → 제외
-- **혼잡 고려(auto 포함)**: 균등 p=10 −9.9%(임계 30s, dev), 극한 p=20 −12.6%,
-  임계 15/60이 결과 불변(극한에서 항상 발동) → 실험 후보 유지
-- **선행 하차(lookahead)**: 의사결정 30회/실행(기준외 2~4회, 계산 ~6ms)에도
-  p=10 +0.13%, p=20 ±0.0% → 실험 후보 유지. 단 계산·예측 기록 구조는 유효
-- **roundrobin 기준**: −24~−51% — 근접 묶음(공간 청크)의 가치를 역증명
+The correct interpretation is: **in this application order (batch size, balance, route), cap expansion explains most of the observed ladder difference**. This is not a unique causal contribution. Balance differs at cap12 (-0.25%) and cap24 (-0.08%); p1 has a similar pattern, with C1 about +6.05%.
 
-## 6. 적용 조건과 한계
+The cap counts requests. Cap24 tasks have a reported median of 32 item units and nine unique locations (maximum 14). Basket capacity is excluded; field feasibility of carrying that batch is unverified. The cap12 ladder gives small +0.1-0.4% estimates with intervals including zero or small gains. Cap6 deteriorates about 11.8% in development.
 
-- **관측 범위**: p=10·R=480 등에서 cap24의 개선을 관측했지만, p=20·R=480에서는 −2.28% 악화했다. 연쇄 시작 소멸·부하 편차·계획 대기가 함께 변했으며 원인의 통제 검증은 없다. 작업/작업자 ≥2라는 적용 규칙은 미검증 가설이다.
-- 이 단계에서는 p=20·R=960의 C3가 미측정이었다. 후속 비교는 문서 19에 있으나 일반 적용 규칙을 확정하지 않는다. cap>24 및 통로 구조별 최적 묶음 크기는 미확인이다.
-- 계산 비용이 일부 기준 대비 감소했더라도 **15초 예산 기준은 미충족**이다. 검증에서 C3 계획 실측 최대 약 21.2초(p10), 35.5초(p1)를 확인했다. 작업자 대기 합/종료시간의 8.27%는 경과시간 직접 지연율과 구분한다.
-- 병목 구조상 수거 시간은 불변(규칙 고정) → 개선 상한은 이동·하차·정렬 축에 존재.
-- 모든 창고·워크로드는 합성 모델이며 실측 근거가 아니다(보행 1.0m/s 등 가정).
+## 5. Rejected or inconclusive development candidates
 
-## 7. 재현
+- **Move/swap:** L4-L3 approximately -3.9 to +0.8 seconds; insufficient stable increment, excluded.
+- **Congestion/auto:** uniform p10 about -9.9% at threshold 30 seconds; stress p20 about -12.6%. Thresholds 15/60 gave unchanged stress decisions because estimates exceeded both; retained as experimental only.
+- **Unloading lookahead:** about 30 decisions per run, 2-4 non-default choices and 6 ms computation, but p10 about +0.13% and p20 about zero. Retain as an experimental option and trace facility, not a preferred policy.
+- **Round-robin:** about -24 to -51% relative results illustrate the importance of spatial grouping under these conditions; they do not make it the only adequate benchmark.
+
+## 6. Scope and limitations
+
+- Cap24 improves observed p10/R480 cases but deteriorates at p20/R480 by 2.28%. Chaining, load spread and planning waiting change together; no isolated causal experiment was performed. A tasks-per-picker >=2 selection rule remains unverified.
+- C3 at p20/R960 was unmeasured in this stage; see document 19 for later comparisons. Cap>24 and optimal caps for other aisle structures remain unverified.
+- Lower cost than another method does **not** meet the 15-second target. Claim verification found C3 maxima around 21.2 seconds (p10) and 35.5 seconds (p1). The 8.27% summed-worker-wait/makespan diagnostic must not be interpreted as direct elapsed delay.
+- Collection time is fixed by the model; possible gains are in travel, unloading frequency and load alignment.
+- All layouts and workloads are synthetic, with uncalibrated speed and handling assumptions.
+
+## 7. Reproduction
 
 ```powershell
 $env:PYTHONIOENCODING='utf-8'
-python -m unittest discover -s tests                                   # 80 tests
-python -I simulation/bottleneck.py results/multi2                      # 병목 분석
-python -m simulation.experiments3 results dev-all                      # 개발 스크린
+python -m unittest discover -s tests
+python -I simulation/bottleneck.py results/multi2
+python -m simulation.experiments3 results dev-all
 python -m simulation.experiments3 results eval-ladder eval-large eval-workload
-python -I simulation/analysis3.py results/multi3-eval                  # 사다리·산식
+python -I simulation/analysis3.py results/multi3-eval
 ```
 
-## 8. 정정된 결론
+The suite had 80 tests at this stage; the final archive has 88. Full experiment commands run simulations; analysis commands read saved records. Preserve existing data when reproducing.
 
-> 기본 합성 창고·480요청·10인에서 C3는 cap12/spatial/NN 대비 종료시간을 64.7초, 전체 집계 3.84% 줄였다. 이번 적용 순서에서는 묶음 확대가 대부분(+3.81%p)을 설명했고, 경로 개선의 추가 기여는 작았다. 바구니 용량 제외, 일부 조건 악화, 계산 예산 미충족과 평가 seed 재사용의 한계가 있다. 20인·480요청에서 -2.28% 악화했으며 전체 적용 규칙은 확정하지 않았다. 확장 프로토타입으로 보존하고 일반 운영 방법으로 권장하지 않는다.
+## 8. Corrected conclusion
+
+> In the default synthetic warehouse with 480 requests and ten pickers, C3 reduced completion by 64.7 seconds, or an aggregate 3.84%, relative to cap12/spatial/NN. Batch expansion accounts for most of the tested ladder difference (+3.81 percentage points), with a small route-improvement increment. Basket-capacity omission, adverse conditions, computation-budget failures and reused evaluation seeds limit the conclusion. Twenty pickers/480 requests deteriorated 2.28%; no general application rule was validated. Preserve the result as an exploratory prototype, not an operational scheduling recommendation.

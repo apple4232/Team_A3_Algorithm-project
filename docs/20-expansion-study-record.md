@@ -2,11 +2,9 @@
 
 Recorded November 21, 2026. Branch: `project-expansion`.
 
-## Decision and Korean summary
+## Scope decision
 
 The user decided to end this project's expansion exploration without merging PR #7. Preserve the branch, all implementation commits, saved experiments, corrections and unresolved questions as a research prototype. The original single-picker project remains the main deliverable. Closing the PR is not a deletion of the branch or a claim that the exploratory results have no value.
-
-확장 부문은 **설계·초기 구현·다단계 탐색 실험을 수행한 프로토타입**으로 보존한다. 일부 합성 조건에서는 묶음 확대와 예상 종료시간 기반 배정의 이득을 관측했지만, 인원·요청량에 따른 악화, 계산 예산 초과, 반복 측정 및 새로운 독립 평가의 부족 때문에 일반 적용 방법으로 확정하지 않는다. PR #7은 병합하지 않고 닫으며, 기존 1인 프로젝트의 최종 성과와 확장 탐색 결과를 구분한다.
 
 This is the current interpretation of the study. Where earlier reports conflict with this record, use the qualifications here. All percentages below are saved-data observations, not measured field productivity.
 

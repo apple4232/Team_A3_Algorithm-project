@@ -2,7 +2,7 @@
 
 As of November 6, 2026. This document compares the supplied 19-page implementation-plan PDF with the four November 2 design documents. It records what was retained, what was clarified for Stages 1-3, and what still needs experimental evidence.
 
-The reference PDF is titled "구현 계획.pdf". Its prose and tables informed the reading structure of these documents. The PDF itself is not bundled in this repository; the explanations below stand on their own.
+The reference is the supplied implementation-plan PDF. Its prose and tables informed the reading structure of these documents. The PDF itself is not bundled in this repository; the explanations below stand on their own.
 
 ## 1. Does the plan keep the project focused?
 

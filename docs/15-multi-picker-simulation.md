@@ -1,257 +1,188 @@
-# 15. 다중 작업자 연속 작업 시뮬레이션 — 설계와 실험
+# 15. Continuous Multi-Picker Simulation: Design and Experiments
 
-> **확장 탐색 종료·기록 보존:** 이 문서는 초기 모델과 2차 보완 기록이다. 최신 누적 이력과 해석은 [전체 확장 기록](20-expansion-study-record.md)을 우선 참조한다. 최종 보존 코드의 전체 테스트는 88개다. 아래의 74개 등은 당시 단계의 기록이며, 3·4차 결과와 현재 종료 결정은 별도로 정리했다. 새 성능 실험 없이 저장 자료를 확인했으며 일반 성능·예산 준수를 확정하지 않는다.
+> **Exploration closed; records preserved.** This document records the initial model and second-round follow-up. Read the [complete expansion record](20-expansion-study-record.md) for cumulative history and current interpretation. The final preserved suite has 88 tests; counts such as 74 below describe earlier stages. Saved data were checked without new performance simulations. General performance and budget compliance were not established.
 
-작성: 2026-11-20 · 구현 브랜치 `multi-picker-simulation`(기준 `code-verification` `ff03681`) ·
-확장 코드 `simulation/`, 테스트 `tests/test_simulation.py`, 현재 결과 `results/multi2/` (1차 기록 `results/multi/` 보존).
+Original report date: November 20, 2026. Implementation branch: `multi-picker-simulation`, based on `code-verification` at `ff03681`. Source: `simulation/`; tests: `tests/test_simulation.py`; follow-up data: `results/multi2/`; initial data preserved in `results/multi/`.
 
-기존 1인 기능(`picking/`)은 수정하지 않았고 확장은 `python -m simulation ...`으로
-별도 실행된다. 기존 37개 테스트가 그대로 통과한다(회귀 확인).
+The original `picking/` package was unchanged. The extension runs separately through `python -m simulation ...`; the 37 baseline tests were retained.
 
-## 1. 문제 정의와 단위
+## 1. Problem and units
 
-- **요청**: 위치·수량·품목별 포장 유형(바로 담기/포장 해체)을 가진 수거 요구.
-- **작업**: 작업자 한 명의 출발(직전 하차 위치) → 배정 요청 전부 수거 → 가장 가까운
-  컨베이어 접근 지점 하차까지.
-- **전체 실험**: 유한한 전체 요청 집합을 작업자 1·10·20명이 나누어 연속 처리해
-  전부 완료하는 과정. 시스템은 요청 전체를 미리 알며, 실행 중 작업에는 요청을
-  추가·재배정하지 않고 발급 전 요청만 이동·교환한다.
+- **Request:** a location, quantity and item handling types (easy collection or opening a wrapper).
+- **Task:** one picker's departure from the previous unloading location, collection of all assigned requests and unloading at the nearest accessible conveyor position.
+- **Episode:** completion of a finite request set by 1, 10 or 20 pickers through successive tasks. All requests are known in advance. Issued tasks cannot receive additions or be reassigned; moves/swaps affect unissued work only.
 
-작업당 상한은 기본 **요청 12개**(수량 상한은 기본 없음, 설정 가능). 근거: 합성
-모델의 초기 실험값이며 실제 바구니 용량 근거는 없다. 240요청 기준
-작업 20개가 만들어져 20명 환경에서는 연속 작업이 충분히 발생하지 않는다. 상한을
-8·16으로 바꾸면 작업 수가 30·15로 변한다(설계상 예시). 20인의 후속 작업은 §9의 R=480·960 조건에서 별도로 확인했다.
+The default task cap is **12 requests**, with no default quantity cap. This is an initial synthetic setting, not a measured basket limit. At 240 requests it creates 20 tasks, insufficient to exercise repeated tasks with 20 pickers. Caps 8 and 16 would create 30 and 15 tasks. Section 9 separately examines 480 and 960 requests.
 
-## 2. 창고와 ㄷ자 컨베이어
+## 2. Warehouse and U-shaped conveyor
 
-기본 창고는 기존 1인 실험과 동일한 격자(세로 통로 10개·x 4m 간격, y 2m 노드,
-가로 통로 y=0/20/40, 36×40m)다. 창고 크기·통로 수·간격은 `WarehouseConfig`로
-분리되어 있다.
+The default graph matches the baseline: ten vertical aisles spaced 4 m apart, nodes every 2 m in depth, three cross aisles at y=0/20/40, and dimensions 36 by 40 m. `WarehouseConfig` separates dimensions, aisle count and spacing.
 
-- **벨트**: 왼쪽(x=0)·뒤(y=40)·오른쪽(x=36) 세 외벽을 따라 폭 1m의 ㄷ자 배치,
-  앞쪽(y=0)은 개방. 지정 투입구 없이 접근 가능 구간 어디서나 하차(5초).
-- **무통과 보장**: 벨트는 외벽 바깥쪽에 있고 그래프 간선은 통로 위 선분뿐이므로
-  어떤 경로도 벨트나 선반을 가로지르지 않는다(테스트 `test_no_edge_crosses...`).
-- **연속 접근 구간의 그래프 표현**: 벨트 옆 통로(외벽 열/행)를 따라 접근 노드를
-  배치하고 하차 비용 = min(통로 최단거리). 기본 간격 2m는 노드 간격과 같아
-  격자 노드 기준 오차 0(정확한 이산화)이고, 일반 간격 s에서 오차 상한은 s/2.
-  간격 3m 구성에서 0.5m 조밀 그래프 대비 최대 오차가 상한 이내임을 테스트로
-  검증했다. 중간 접근 노드 추가는 기존 노드 간 거리를 바꾸지 않는다(테스트).
-- **종료 비용**: 직선거리가 아니라 통로상 최단거리다. 마지막 방문 위치가 바뀌면
-  종료 비용을 다시 계산한다(`routes.RouteContext.cost`).
+- **Conveyor:** left (x=0), back (y=40) and right (x=36) boundaries, approximately 1 m wide, with the front open. No fixed ports; unloading takes five seconds at an accessible point.
+- **No crossings:** the belt lies outside the boundary and graph edges follow aisle segments; geometric tests reject belt/shelf crossings.
+- **Access approximation:** boundary access nodes are placed along adjacent aisles. Unloading cost is minimum traversable shortest-path distance. Default 2 m spacing matches graph nodes, giving zero error for those nodes. The stated general spacing-s bound is s/2; 3 m spacing was checked against a 0.5 m reference. Intermediate access nodes preserve existing node distances.
+- **End cost:** `routes.RouteContext.cost` uses aisle distance and recalculates the conveyor cost if the final visit changes.
 
-## 3. 수거·하차·혼잡 규칙 (작업 지시값 = 기본값)
+## 3. Handling, unloading and congestion assumptions
 
-| 항목 | 값 |
+| Parameter | Value |
 |---|---|
-| 바로 담기 | 10초/품목, 기본 품목 비율 40% |
-| 포장 해체 후 담기 | 30초/품목(담기 포함), 60% |
-| 하차 | 컨베이어 도착 후 5초 |
-| 수거 구역 | 같은 통로·같은 쪽 선반을 길이 4m로 분할 |
-| 구역 동시 수거 | 최대 3명, 초과 시 도착 순서(동시 도착은 작업자 ID) 대기 |
-| 동시 시각 처리 | 수거/하차 완료를 먼저 처리한 뒤 신규 진입 허용 |
+| Easy collection | 10 seconds per item; default share 40% |
+| Wrapped collection | 30 seconds per item including opening and collection; share 60% |
+| Unloading | 5 seconds after conveyor arrival |
+| Pickup zone | One shelf side of an aisle over a 4 m segment |
+| Concurrent service | At most 3 pickers; FIFO waiting, worker-ID arrival tie-break |
+| Same-time events | Complete collection/unloading before admitting new service |
 
-같은 작업자가 같은 위치의 품목을 여러 개 수거하면 방문 1회·수거시간 합산.
-포장 유형은 요청 데이터에 고정되어 모든 비교 방법에 동일하게 적용된다.
+Multiple requests at the same position share one visit within a task; item handling times add. Item types are fixed in workload data for all paired methods.
 
-**구역 모델의 가정**: 합성 격자에는 좌/우 선반 구분이 없어 `(y//2)%2`로 쪽을
-번갈아 배정하고 구역 키 = (통로 x, 쪽, ⌊y/L⌋)를 쓴다. 이 규칙에서 같은 쪽의
-인접 위치는 4m 떨어져 있으므로 L=4m면 사실상 위치 단위, L=8m면 같은 쪽 2개
-위치가 한 구역이 된다. 구역 길이 민감도(2·4·8m)가 이 입도 차이를 담는다.
+**Synthetic side assumption:** the graph has no measured left/right shelf labels. Side alternates by `(y//2)%2`, with zone key `(aisle x, side, floor(y/L))`. Same-side neighbours are 4 m apart, so L=4 m is effectively location-level and L=8 m groups two same-side positions. Zone-length sensitivity studies reflect this granularity.
 
-통로는 양방향 2인 통행을 가정하고 1인 통로·통행 차단·우회 지연은 없다.
-동일 간선의 시간 겹침 통행(같은/반대 방향 쌍)은 지표로만 기록한다. 대기자는
-통행을 막지 않는 공간에 있는 것으로 가정한다. 바구니 용량·빈 바구니 보충·
-벨트 운송/적재 혼잡은 범위 밖이다.
+Assume two-way passing. Single-person aisles, blocked traffic and detour delays are excluded. Same/opposite-direction edge overlap is recorded only. Waiting workers do not block traffic. Basket capacity, empty-basket supply and conveyor transport/loading congestion are excluded.
 
-**보행 속도 1.0m/s는 모델 가정**이며 현장 실측값이 아니다. 거리→시간 환산의 민감도는 별도 실험을
-하지 않았고 한계로 기록한다.
+**Walking speed 1.0 m/s is an assumption, not a field measurement.** A systematic distance-to-time sensitivity study was not completed at this stage.
 
-## 4. 알고리즘 (거리 전처리와 순서 최적화 분리)
+## 4. Algorithms: distance preparation versus visit order
 
-전처리: Dijkstra 기반 위치 간 거리·경로(기존 `picking.distances.dijkstra` 재사용)와
-컨베이어 종료 비용. 순서 최적화는 `simulation/routes.py`가 전부 담당한다.
+Preparation uses Dijkstra distances/paths, reusing `picking.distances.dijkstra`, plus conveyor end cost. Visit ordering is implemented in `simulation/routes.py`.
 
-단계별 구성 요소:
+1. Prepare location distances, paths and conveyor end costs.
+2. Spatial assignment: sort requests by `(x,y)` and split into capped consecutive chunks.
+3. Balance: adjust chunk boundaries using NN travel plus collection-time estimates.
+4. NN route with coordinate tie-breaks.
+5. 2-opt first improvement with restart; reinsertion visits locations in pass-start order and chooses the best insertion for each.
+6. Move/swap unissued requests to reduce predicted completion; exclude issued/reserved tasks.
+7. Congestion-aware evaluation using predicted completion, waiting and distance lexicographically. Forecast overlap uses planning-time information only.
 
-1. 거리·경로 및 벨트 종료 비용 (§2)
-2. 거리 중심 초기 배정: 요청을 (x, y) 정렬해 상한 내 연속 청크로 분할
-3. 작업량 균형 배정: 이동(NN 추정)+수거 추정시간 기준 청크 경계 재조정
-4. NN 초기 경로(동률은 좌표 순)
-5. 2-opt(첫 개선 채택 후 재탐색)·재삽입(순회 시작 순서대로, 모든 삽입 자리 중 최선)
-6. 발급 전 요청의 이동·교환(추정 완료시간 최대 감소; 발급/예약 작업 제외)
-7. 혼잡 고려 평가: 채택 기준 (전체 종료시간, 총대기, 총거리) 순. 계획 시점
-   정보만으로 구역별 예상 구간 겹침 대기 추정을 더해 비교한다.
+Compare `nn`, `nn-2opt`, `nn-reinsert`, `nn-2opt-reinsert`, `nn-reinsert-2opt`, and `alt` (alternate until no improvement or budget exhaustion). The later segment-DP candidate `nn-2opt-reinsert-segdp` uses windows of six, stride three, one sweep, final window included and boundary entry/exit costs.
 
-비교 조합(동일 초기 배정에서 출발): `nn`, `nn-2opt`, `nn-reinsert`,
-`nn-2opt-reinsert`, `nn-reinsert-2opt`, `alt`(교대 반복, 개선 없거나 예산 소진 시
-종료). 구간 DP(창 6·간격 3·1회 순회, 마지막 창 포함, 경계 진입/이탈 비용 포함)는
-기본 조합 정확성 검증 후 추가 후보 `nn-2opt-reinsert-segdp`로 평가한다.
-기존 단일 작업자용 재삽입·구간 DP(`feature/two-stage-route`의 `improve_route`)는
-고정 컨베이어 `DistanceTable` 전용이라 여기서는 의미론만 재사용했다.
+The single-picker `improve_route` on `feature/two-stage-route` depends on a fixed-conveyor `DistanceTable`; this extension reused semantics rather than that implementation. Here each task may have a different preceding unload start and a final-visit-dependent conveyor endpoint.
 
-기존 1인 경로 개선과 달리 각 작업의 시작점이 직전 하차 위치로 변하고 종료 비용이
-마지막 위치에 따라 재계산된다.
+## 5. Time simulation and computation budgets
 
-## 5. 시간 시뮬레이션과 계산 예산
+The event heap orders by `(time, priority, sequence)` and processes movement, collection, waiting, unloading and task release. One non-preemptive sequential planner resource is intended.
 
-이벤트 시뮬레이터(힙, `(시각, 우선순위, 순번)`)가 이동·수거·대기·하차·발급을
-처리한다. 계획 계산은 **하나의 순차 자원**에서 비선점으로 수행된다:
+- Include initial planning in episode time from t=0.
+- Subsequent planning overlaps current work. Issuing ROUTE operations take priority over PREROUTE and IMPROVE. Ready plans create zero extra planning wait; late plans expose only their excess delay.
+- `measured` uses real computation duration once; `fixed` uses configured delays for reproducibility. Physical simulation time and computer runtime are distinct.
+- Forecasts do not read actual future congestion. Record predicted-versus-realized task completion.
+- Secure a complete request partition first. Evaluate candidates on copies and commit atomically. On `BudgetExceeded` or changed targets, discard the candidate and retain a valid plan.
 
-- 최초 계획 계산시간은 전체 소요시간에 포함(종료시간 기준 t=0).
-- 이후 계산은 이전 작업과 겹쳐 처리된다. 발급용 경로 계산(ROUTE)이 사전
-  계산(PREROUTE)과 배정 개선(IMPROVE)보다 우선하고, 계획이 먼저 준비되면
-  추가 대기는 0초, 늦으면 초과 지연만 작업자 대기에 반영된다(테스트로 구분 검증).
-- 물리 시뮬레이션 시간과 컴퓨터 실행시간을 구분한다. `measured` 모드는 실제
-  계산시간을 측정해 그대로 시뮬레이션 시간에 반영하고(이중 계산 없음),
-  `fixed` 모드는 고정 지연을 써서 재현성 검증에 사용한다.
-- 미래의 실제 혼잡을 읽지 않는다. 계획은 추정만 사용하고 작업별
-  예측 완료시간과 실제의 오차를 기록한다(집중 시나리오에서 오차 증가 확인).
-- 초기에 완전한 유효 계획(전체 요청 정확히 1회 배정)을 확보하고 개선은 복사본
-  평가 후 한 번에 반영하며, 예산 초과(`BudgetExceeded`)·대상 변화(폐기) 시
-  마지막 유효 계획을 반환한다. 협력적 시간 제한이며 엄격한 실시간 마감 보장이
-  아니다.
+Later strengthened tests found and fixed a planner-occupancy defect in the initial version. Current resource handling marks the operation occupied through completion. Search count limits and cooperative checkpoints do not prove a strict wall-clock deadline.
 
-## 6. 정확성 검증 (초기 확장 26개 및 보완 11개)
+## 6. Correctness checks at the follow-up stage
 
-검증한 성질(테스트 개수가 아닌 성질 중심):
+Initial extension tests: 26. Follow-up tests: 11. With 37 original tests, the then-current full suite **passed 74 tests** on Python 3.12.2; the final archive later reached 88.
 
-- 요청 정확히 1회 배정(초기·개선 후·중단 시 모두)
-- 중복 위치 방문 병합과 수거시간 합산(수작업 대조)
-- 실제 이동거리 = 경로 비용 합(단일 작업자·무혼잡), 예측 오차 0
-- 벨트 근사 오차 상한(s/2), 중간 노드가 기존 거리 불변, 간선 무통과(기하 검증)
-- 10·30초 수거·5초 하차가 makespan에 정확히 반영(수작업 계산 대조)
-- 구역 인원 상한·FIFO·동시 완료 우선(동시 도착 4인 인위 사례, 대기 10초 검증)
-- 첫 집결지 출발·이후 개별 하차 위치 출발(작업 기록 start_node)
-- 계획 겹침(추가 대기 없음)과 지연(초과 대기 발생) 구분
-- 빈 요청(makespan 0)·동시 이벤트·불가능 입력(명확한 ValueError)
-- 개선 중단 시 유효 계획 유지(예산 1), 고정 지연 재현성(2회 실행 동일)
-- 발급 작업의 배정 개선 제외, 혼잡 고려 모드 불변식 유지
-- 작은 사례(≤5 위치) 전열거 최적과 일치(구간 DP=전체 최적), 모든 조합 불악화
-- 교대 반복 종료성·멱등성, 마지막 위치 변경 시 종료 비용 재계산
-- 집중 시나리오 압력 테스트(대기·예측 오차 양수)
-- 기존 1인 기능 회귀(기존 37개 테스트 + picking 직접 실행 검증)
+Verified properties at this stage included:
 
-초기 스위트 63개에 보완 테스트 11개를 추가했다. 현재 전체 스위트 **74개가 통과**했다(Python 3.12.2). 기존 37개와 확장 37개를 포함한다. 순차 자원 직렬화·정확한 계획 대기·FIFO·중단 체크포인트 검증을 강화했으며, 모든 경우의 정확성이나 전 단계 중단을 증명하는 것은 아니다.
+- Request ownership exactly once before/after improvement and interruption.
+- Duplicate-location visit merging with summed handling time, checked by hand.
+- Route-distance consistency and zero prediction error in a no-congestion single-picker case.
+- Conveyor approximation bound, intermediate-node distance preservation and geometric no-crossing checks.
+- Exact 10/30-second collection and five-second unloading in hand-calculated makespan cases.
+- Zone capacity, FIFO and completion-first ties; a four-picker example checks ten seconds of waiting.
+- Shared first start and subsequent starts from recorded unload positions.
+- Exact planning overlap/late-delay and sequential resource cases strengthened in the follow-up.
+- Empty episode (zero makespan), simultaneous events and invalid coordinates producing `ValueError`.
+- Valid-plan preservation under evaluation/interruption limits and fixed-mode replay equality.
+- Issued-work exclusion and congestion-mode partition invariants.
+- Tiny exhaustive route comparisons, whole-route agreement for small segment-DP cases, and no worsening relative to NN in examined cases.
+- Alternating-search termination/idempotence and updated end cost after changing the last visit.
+- Concentrated-demand stress with positive waiting and prediction error.
+- Original single-picker regressions and direct `picking` execution.
 
-## 7. 성능 실험 설계
+These tests verify specific cases, not all schedules or every interruption point.
 
-- **workload 특성**: 기존 특성에 작업자 수·전체 요청량·작업당 요청 수, 포장
-  비율(`easy_ratio`), 공간 집중(`hot_aisle_share`, 한 통로 집중), 동일 위치 중복
-  (`duplicate_share`), 작업량 불균형(작업별 추정 편차), 이전 하차 위치-다음 요청
-  거리(작업 기록 start_node 기반)를 기록/제어한다.
-- **민감도**: 포장 비율 30·60·90%, 구역 길이 2·4·8m, 동시 인원 2·3·4명을
-  요인별로(전 조곱 아님) + 구역길이×인원 상호작용 소규모 탐색.
-- **분리 설계**: 컨베이어 구조(벨트 비용 반영 여부는 본 확장의 전제), 배정
-  (spatial vs balanced), 경로 개선(조합), 혼잡 고려(congestion_aware)를 독립
-  축으로 비교한다. 모든 방법이 같은 요청·포장·혼잡 규칙으로 평가된다.
-- **고정 요청량(R=240)** 실험과 **작업자당 고정(24개×인원)** 실험을 구분한다.
-- 개발 seed(짝수 6개)로 후보 선택, 평가 seed(홀수 6개)로 최종 비교. 실행 순서는
-  고정 rng로 무작위화하고 원자료(JSONL)를 남긴다.
-- **지표**: 종료시간(최초 계획 시작~마지막 하차 완료), 개선율
-  `(기준−제안)/기준×100`(기준=같은 배정·같은 seed의 NN), 이동거리, 총/개인
-  대기, 작업시간 편차·유휴, 계획 계산시간·반영 지연, 유효 계획 반환율·예산
-  초과, 개선/동일/악화 비율, seed 그룹 부트스트랩 95% 구간.
+## 7. Initial experiment design
 
-## 8. 참고 자료: 확인된 사실과 모델 가정의 구분
+Workload fields include size, spatial pattern, start/conveyor relationships, item mix (`easy_ratio`), hotspot share (`hot_aisle_share`), duplicate share, task-time imbalance and chained start locations.
 
-공개 자료에서 확인된 사실: 쿠팡 물류센터에서 피킹한 토트가 가득 차면 카트를
-컨베이어로 옮겨 올리는 작업 흐름([현장 체험기](https://m.blog.naver.com/skantlrpp/222902163328)),
-물류 공정이 입고/출고/허브/ICQA 등으로 나뉜다는 점([나무위키 정리](https://namu.wiki/w/쿠팡풀필먼트서비스/공정)),
-일부 센터의 로봇·AI 적용([쿠팡 뉴스룸](https://news.coupang.com/archives/19485)).
+Initial factor studies used wrapped shares 30/60/90%, zone lengths 2/4/8 m, capacities 2/3/4 and a small zone-length/capacity interaction. This is not a full Cartesian product.
 
-모델 가정(실측 아님): ㄷ자 벨트 배치와 폭 1m, 어디서나 하차, 하차 5초,
-수거 10/30초와 비율, 구역 4m/3인, 보행 1.0m/s, 통로 2인 교행. 실측 도면이
-없으므로 이 모델은 **실제 센터의 재현이 아니다**. 시뮬레이션 개선율을 실제
-현장의 입증된 개선율로 해석하지 않는다.
+Compare assignment (`spatial`/`balanced`), route combinations and congestion awareness while using identical requests, handling types and physical queue rules. The U-shaped conveyor is the extension's base setting rather than an isolated factor in these runs.
 
-## 9. 결과 요약
+Separate fixed total demand R=240 from fixed per-picker demand (24 times picker count). Initial development/evaluation used six even/six odd seed groups. Record randomized execution order, status, makespan, distance, waiting, imbalance, idle time, planning cost/delay, validity and budget outcomes. Later rounds reused evaluation IDs; see the final archive for qualifications.
 
-1차 결과(results/multi, 786실행)는 계획 자원 직렬화 결함이 있던 시기 데이터다(2차에서
-수정). 이 절은 2차 보완 실험(results/multi2, 474실행: fixed-total 126, per-picker 84,
-continuous20 84, fixed20 84, congestion 96; 평가 seed 10개 203~221, 개발 4~6개,
-실행 순서 무작위화)로 갱신했다. 1차 자료는 상대 비교도 유효하다고 보장할 수 없어 현재 성능 결론에 사용하지 않는다. 환경: Windows 10, Python 3.12.2, 커밋 371df70+.
-분석: python -I simulation/analysis2.py results/multi2.
+## 8. References versus assumptions
 
-### 개선율 산식 (두 값은 다르다)
+The original report referred to a [field account](https://m.blog.naver.com/skantlrpp/222902163328) for tote-to-conveyor workflow, a [process overview](https://namu.wiki/w/%EC%BF%A0%ED%8C%A1%ED%92%80%ED%95%84%EB%A8%BC%ED%8A%B8%EC%84%9C%EB%B9%84%EC%8A%A4/%EA%B3%B5%EC%A0%95) and the [Coupang newsroom](https://news.coupang.com/archives/19485) for examples of automation. Those references are contextual, not measured layout or timing calibration.
 
-- 주요(전체 산식): (Σ기준 종료시간 - Σ제안 종료시간)/Σ기준 x 100
-- 보조(실험별 평균): mean((기준-제안)/기준 x 100)
-- 신뢰구간은 seed 그룹 재추출 시 해당 산식을 매번 다시 계산해 산출하며,
-  두 산식의 CI를 서로 혼용하지 않는다. 조건이 다른 실행은 합산하지 않는다.
+The U shape, 1 m width, unrestricted accessible unloading, 10/30-second handling, five-second unloading, 4 m/three-picker zones, 1.0 m/s speed and two-person passing are model assumptions. This is **not a replica of an actual centre**, and simulated gains are not measured field productivity.
 
-### 20인 연속 작업 - "20인 무개선"은 조건 한정으로 정정됨
+## 9. Follow-up results
 
-배정 기록(작업 단위 원자료, NN 기준):
+Round one (`results/multi`, 786 records) predates the planner-serialization fix. It is historical; even relative rankings need not survive a shared defect. Current comparisons at this stage use `results/multi2`, 474 runs: fixed-total 126, per-picker 84, continuous20 84, fixed20 84 and congestion 96.
 
-| 조건(p=20) | 작업/실행 | 작업자별 작업 분포(min/중앙/max) | 연쇄 시작 수/실행 | 유휴 |
+The producing environment was reported as Windows 10 and Python 3.12.2, code `371df70` or later. Evaluation used ten odd seeds 203-221 and development used four to six groups, with randomized order.
+
+```text
+python -I simulation/analysis2.py results/multi2
+```
+
+### Two improvement formulas
+
+- Primary aggregate: `100 * (sum baseline completion - sum candidate completion) / sum baseline completion`.
+- Secondary: mean paired per-run percentage improvement.
+- Bootstrap seed groups and recompute each formula within every resample. Keep condition cells separate and do not interchange their intervals.
+
+### Twenty-picker repeated tasks
+
+NN task records show:
+
+| Requests | Tasks per run | Tasks per picker: min/median/max | Chained starts per run | Idle pickers |
+|---|---:|---|---:|---:|
+| 240 | 20 | 1/1/1 | 0 | 0 |
+| 480 | 40 | 2/2/2 | 20 | 0 |
+| 960 | 80 | 4/4/4 | 60 | 0 |
+
+At R=240 fixed-mode completion improvement is zero (0 improved, 10 tied, 0 worse); measured improvement is about -0.02%. This isolates the earlier lack of repeated tasks, not route optimality.
+
+At R=480, aggregate evaluation estimates are fixed +0.23% [0.05,0.55], measured alternating +0.30% [0.13,0.52] and measured `nn-2opt-reinsert` +0.27% [0.09,0.48]. At R=960 fixed is +0.06% [-0.17,0.26], while measured is approximately zero. A more balanced repeated-work allocation is a possible explanation, not an established cause.
+
+Do not infer that repeated tasks always help or a single task cannot improve.
+
+### Separate comparison designs
+
+- Fixed demand R=480, p=5/10/20: mixed results, development -0.28 to +0.18%, evaluation +0.09 to +0.67%.
+- Fixed per-picker demand of 48 requests (four tasks): evaluation approximately +0.67/+0.09/-0.00% for p=5/10/20. Parallel dilution is an interpretation requiring caution.
+- Repeated-task comparison at p=20, R=240/480/960: use the table above. Do not pair different demand volumes as if they were identical workloads.
+
+### Routing versus computation delay
+
+Fixed mode supports an R=480 route-related benefit under fixed computation delays. Measured mode also exposes sequential planning waits. At p=20/R=960, summed worker planning wait averages 209.9 seconds versus 2.35 seconds in fixed mode. This is worker-time, not an additional elapsed 209.9 seconds to add to makespan. Causal contributions to runtime variation remain unresolved; worst observed deterioration was -1.36%.
+
+### Absolute example
+
+Evaluation p=20/R=480, measured `nn-2opt-reinsert`, ten seeds: NN completion 869.8 seconds versus 867.5, a 2.3-second mean saving; distance 2076 to 2057 m; no zone wait; 7 improved/0 tied/3 worse; worst -0.12% at seed 211. Measured planning is 5.68 seconds, exposed planning delay 3.48 and summed worker planning wait 69.2.
+
+### Congestion v1 and v2
+
+Stress: hotspot 0.8, duplicates 0.3, zone length 8 m, capacity two; six development and ten evaluation groups.
+
+| Method / population | Mean per-run completion improvement | Waiting saving (positive means less) | Distance change (positive means more) | Prediction MAE |
 |---|---|---|---|---|
-| R=240 | 20 | 1/1/1 | 0 | 0 |
-| R=480 | 40 | 2/2/2 | 20 | 0 |
-| R=960 | 80 | 4/4/4 | 60 | 0 |
+| v1 evaluation p10 / p20 | -5.07% / -3.76% | -20 / +48 s | +18 / +26 m | Condition-dependent |
+| v2 evaluation p10 / p20 | +0.12% / -2.97% | +54 / +61 s | -4 / +7 m | 8.6 to 5.9 / 34.8 to 31.8 s |
+| v2 development p10 / p20 | -0.42% / -12.62% | +54 / -65 s | -25 / -2 m | Improved or similar |
 
-- R=240(연속 작업 없음, 전 작업 집결지 발급)에서는 개선 0%(fixed 개선/동일/악화 0/10/0,
-  measured -0.02%) - 1차 "20인 무개선" 결론의 실제 조건이 기록으로 입증됐다.
-- R=480(작업 2개/인, 연쇄 시작 20회)에서는 20인도 유의 개선:
-  fixed +0.23% [+0.05, +0.55], measured alt +0.30% [+0.13, +0.52],
-  nn-2opt-reinsert +0.27% [+0.09, +0.48] (eval 10 seed, 전체 산식).
-- R=960(작업 4개/인): fixed +0.06% [-0.17, +0.26], measured -0.00% - 개선 소멸.
-  체인이 길어지면 작업 배분이 균등해져 경로 개선 여지가 줄어드는 것으로 보이나
-  이는 가설이다(직접 검증 안 됨).
-- 결론: R=480에서는 개선이 관측됐지만 R=960에서는 불확실했다. 작업 횟수나 연속 시작만으로 효과를 일반화할 수 없다. R=240의 종료시간 불변 역시 개별 경로의 개선 불가능이나 NN 최적성을 뜻하지 않는다.
+V1's simultaneous-start approximation and additive objective differed from the intended completion/wait/distance order. V2 corrects the evaluation structure and staggers start forecasts. Its evaluation waiting and prediction errors improve, but distance does not improve in every condition, and development p20 deteriorates. Stable completion gains remain unestablished; evaluation p20's worst case is -14.15%.
 
-### 세 가지 비교 설계 (동일 요청·포장·창고·규칙, 같은 seed 쌍)
+Some workers wait less while others wait more; the last finisher can wait longer. These are observations, not causal proof. Summing positive waiting reductions and positive distance increases across different cases cannot establish why makespan worsened. Adoption-to-execution matching remains needed.
 
-- 전체 요청량 고정(R=480, p=5/10/20): 개선 혼재(dev -0.28~+0.18%, eval +0.09~+0.67%).
-- 작업자당 요청량 고정(48개=4작업): eval +0.67/+0.09/-0.00% (p=5/10/20) -
-  작업자 수가 커질수록 기여 감소(병렬 희석).
-- 연속 작업 비교(p=20, R=240/480/960): 위 표 참조. 요청량이 달라진 실험 간
-  개선율을 직접 짝지어 비교하지 않는다.
+Keep v2 experimental and congestion off by default until stable benefit is verified.
 
-### 경로 개선 vs 계산 지연 분리 (fixed vs measured, p=20)
+### Historical reanalysis
 
-- fixed(고정 계산 지연, 논리적 차이만): R=480 +0.23% 유의 - 경로 개선 효과가 실질적.
-- measured(실측 반영): 개선 유지되나 계획 직렬화 대기가 커진다. R=960 measured에서
-  작업자 계획 대기 총평균 209.9초(fixed 2.35초) - 순차 계획 자원 1개가 20인·80작업
-  규모에서 대기 부담이 관측됐다. 이 209.9초는 작업자별 계획 대기를 합산한 실행 평균이며 전체 종료시간에 다시 더할 수 없다. 종료시간 변동의 인과 기여는 별도 분석이 필요하다(악화 사례 최대 -1.36%).
+Run `python -I simulation/analysis2.py results/multi` separately; see [historical output](../results/multi/analysis2-historical.txt). A label bug that treated second-round per-picker rows as first-round evidence was corrected. The old 1.14% ten-picker/balanced claim is retained as a pre-fix per-run observation, not a current selection basis.
 
-### 절대값 예시 (eval, p=20, R=480, nn-2opt-reinsert, n=10)
+## 10. Remaining limitations at this stage
 
-기준(NN) 종료시간 869.8s -> 제안 867.5s (2.3초/실행 절감), 이동거리 2076->2057m(-19m),
-대기 0초(균등 시나리오), 개선/동일/악화 = 7/0/3, 최대 악화 -0.12%(seed 211).
-계획 계산 실측 5.68s, 반영 지연 3.48s, 작업자 계획 대기 69.2s.
+- Historical README wording called the UI planned despite an implemented local demo; the branch's current header clarifies this.
+- Synthetic side assignment lacks real shelf-side data.
+- Walking, unloading and collection-time sensitivity was incomplete.
+- Aisle interaction is observed but does not affect schedules.
+- Congestion forecasts use planning-time overlap estimates without learning/updating from observed errors.
+- Measured planning times depend on the machine.
 
-### 혼잡 고려 방식 - v1 실패 원인과 v2 보완 결과
-
-극한 시나리오(hot 0.8, 중복 0.3, 구역 8m, 인원 2; dev 6 + eval 10 seed, 같은 seed 쌍):
-
-| 방식 | 종료시간 개선율(실행평균) | 대기 절감(양수=감소) | 거리 변화(양수=증가) | 예측MAE |
-|---|---|---|---|---|
-| v1 (eval p=10 / p=20) | -5.07% / -3.76% | -20s / +48s | +18m / +26m | 악화 |
-| v2 (eval p=10 / p=20) | +0.12% / -2.97% | +54s / +61s 감소 | -4m / +7m | 8.6->5.9s / 34.8->31.8s 개선 |
-| v2 (dev p=10 / p=20) | -0.42% / -12.62% | +54s / -65s | -25m / -2m | 개선/유사 |
-
-- v1 실패 원인(기록 기반): 동시 시작 가정 대기 추정 왜곡, 채택 기준이
-  (종료시간,대기,거리) 순서와 불일치(시간 합산), 대기 감소에도 마지막 완료자
-  대기 증가(102->145s), 거리 증가 수반.
-- v2 보완(분산 시작 LPT 추정 + 사전순 채택)은 eval 대기·예측 오차를 개선했지만 거리는 10인 -4m, 20인 +7m로 조건별로 달랐다. dev 20인에서는 악화도 있었다. 종료시간의 안정적 이득은 미확립(eval p=10 +0.12%이나
-  p=20 -2.97%, 최악 -14.15%, dev p=20 -12.62% 등 분산 큼).
-- 대기 감소와 증가가 작업자별로 함께 관측되고, 마지막 완료자의 대기가 증가한 비교도 있었다. 이는 참고 관측이며 원인을 입증하지 않는다. 대기 감소 양수만의 합과 거리 증가 양수만의 합은 단위와 대상이 달라 인과적 기각 근거가 될 수 없다. 채택별 예측-실제 대응 분석이 필요하다.
-- 판정: v2도 기본 채택하지 않고 실험 후보로 유지. 안정 이득 확인 전까지
-  거리 중심(off)이 기본이다.
-
-### 1차 결과 재계산 (전체 산식 / 실행별 평균, 버그 시기 데이터)
-
-1차 자료 재계산은 `python -I simulation/analysis2.py results/multi`로 별도 수행한다. [역사적 재분석 출력](../results/multi/analysis2-historical.txt)을 참조한다. 2차 per-picker 자료를 1차 재계산으로 표시하던 출력 오류를 수정했다. 1차의 1.14% 주장은 결함 수정 전 조건별 실행 평균으로만 보존하며 현재 알고리즘 선택의 근거로 사용하지 않는다.
-
-## 10. 남은 문제와 한계
-
-- 기존 문서-동작 차이: README 도입부는 UI를 "계획"으로 서술하지만 로컬 데모가
-  구현되어 있다(`docs/13-code-verification.md`에 이미 기록된 사항, 이번에 재확인).
-- 구역 쪽(side) 배정 규칙이 인위적이다(§3). 실선반 좌/우 데이터가 없어 대안이
-  필요하며, L 민감도가 입도 차이를 대신 담는다.
-- 보행 속도·하차/수거 시간의 시간 민감도를 실험하지 않았다.
-- 통행 혼잡은 지표로만 기록하고 경로·스케줄에 반영하지 않았다(지시 범위 준수).
-- 혼잡 고려 추정은 계획 시점 정보만 쓰는 단순 겹침 계수다. 예측-실제 오차는
-  기록하지만 학습·갱신은 하지 않는다.
-- `measured` 모드의 계산시간은 실행 기계에 의존한다(환경 기록 참조).
+Later experiments and closure do not remove these assumptions; read the final study record for the current conclusions.

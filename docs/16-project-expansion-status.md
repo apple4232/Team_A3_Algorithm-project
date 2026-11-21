@@ -6,8 +6,6 @@ Recorded November 21, 2026. Branch: `project-expansion`.
 
 The user ended the current expansion exploration and requested that PR #7 be closed without merging. Preserve the branch, code, plans, experiments and negative results as an exploratory prototype. The original single-picker project remains the primary deliverable.
 
-현재 상태: **확장 탐색 종료·코드와 연구 기록 보존**. 일부 합성 조건의 개선을 관측했지만 일반 적용 가능성·계산 예산·최종 독립 검증을 함께 확보하지 못했다. 새 성능 실험을 계속하지 않고 결과와 한계를 정리한다. PR #7은 병합 없이 닫는다.
-
 Start with the [complete development and closure record](20-expansion-study-record.md). It supersedes overbroad statements in earlier stage reports.
 
 ## What is preserved

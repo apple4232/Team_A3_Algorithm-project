@@ -2,7 +2,7 @@
 
 Recorded November 20, 2026. This document puts the expansion plan discussed in PR #5 into a tracked repository file. It describes intended behavior and acceptance criteria; inclusion here does not certify that every item is implemented or validated.
 
-계획 문서를 저장소 파일로 추가했다. 초기 구현과 실험은 존재하지만 보완 검증은 남아 있다. 현재 완료 범위는 [진행 상황](16-project-expansion-status.md)을 우선 참조한다.
+The plan is tracked as a repository file. Initial implementation and experiments exist, but follow-up validation remains incomplete. See the [current status](16-project-expansion-status.md) for the verified scope.
 
 ## 1. Objective and workflow
 

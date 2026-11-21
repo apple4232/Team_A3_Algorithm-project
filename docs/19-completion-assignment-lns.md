@@ -1,85 +1,72 @@
-# 19. 4차 입증 — 거리 절약 묶음·예상 종료 배정·제한적 LNS
+# 19. Fourth-Round Study: Savings Batching, Completion Assignment and Limited LNS
 
-> **탐색 보고·현재 해석:** 확장 탐색을 종료하고 [전체 기록](20-expansion-study-record.md)에 보존했다. 재사용 평가 seed의 후속 비교이며 최종 독립 평가가 아니다. 가변 묶음은 미발동으로 미평가, LNS 결과 불변의 원인은 미확정이다. 시간 예산도 미충족이다. 원문 작성일 표기는 2026-11-22로 현재 통합일(11월 21일)보다 뒤에 있어 실행일 증거로 사용하지 않는다.
+> **Current interpretation:** exploration ended; see the [complete record](20-expansion-study-record.md). These comparisons reuse evaluation seed IDs and are not a fresh final independent test. Variable splitting was inactive and therefore unevaluated. LNS outcome invariance has unresolved causes. Computation budgets were not met. The imported report bears a November 22, 2026 label, later than the November 21 archive integration; do not use that label as proof of execution date.
 
-작성: 2026-11-22 · 브랜치 `multi-picker-evidence` · 원자료 `results/multi4-dev/`(20실행),
-`results/multi4-eval/`(360실행: fixed 240 + measured 120) · 환경: Windows 10, Python 3.12.2.
-질문: **현재 cap24 조합(C3)보다 종료시간을 추가로 줄일 수 있는가?**
+Source branch: `multi-picker-evidence`. Data: `results/multi4-dev/` (20 runs), `results/multi4-eval/` (360: 240 fixed and 120 measured). Reported environment: Windows 10, Python 3.12.2.
 
-## 1. 구현 (모두 계획 시점 정보만 사용)
+Question: **Can the existing cap24 candidate C3 be improved further?**
 
-- **savings 묶음**(`assignment.savings_bundles`): 초기=동일 위치 그룹, 병합 절약
-  est(A)+est(B)−est(A∪B) (NN 근사+벨트 종료, 시작점=집결지 가상 기준), 중심 k-근접
-  후보만 검사(k=8), 절약 내림차순·동률 사전순, 요청 상한 준수.
-- **completion 배정**(`assignment.completion_schedule`): 묶음 추정 내림차순 검사,
-  finish_j = avail[j] + d(pos[j], 첫방문)/speed + 수거(10/30초·수량 반영) + 벨트/하차
-  최소 작업자 배정. pos 갱신: 첫=집결지, 이후=직전 묶음 NN 경로 말단의 최근접 벨트
-  접근(예측). 시뮬레이터는 담당 지정(assigned_picker) 발급을 존중.
-- **가변 묶음**(`ensure_task_count`): 작업 수 < 작업자 수면 최대 묶음 절반 분할.
-- **제한적 LNS**(`lns.lns_improve`): 병목(추정 종료 최대) 묶음에서 q개 제거
-  (병목-중심거리 / 고정 seed 무작위 교대), 최선 삽입 복구(묶음 단독 추정 증분으로
-  후보 선택 — 전체 재계산 회피), 채택은 추정 전체 종료 감소만. 반복/wall 예산 분리,
-  중단 시 마지막 유효 계획 반환, 후보 검증(분할·상한) 후 반영.
-- 계산비용: 추정 캐시((시작점, 요청집합) 키), LNS 증분 평가. 단계별 계산시간
-  `plan.phases` 기록. 기존 15초 기준 유지.
+## 1. Implementation using planning-time information
 
-테스트 88개 통과(신규 8: savings 분할·동일위치 병합·결정론, completion 가용시각
-단조·불변식, 가변 묶음 최소 작업 수, LNS 분할 보존·중단 보존·추정 불악화, 전 파이프라인 fixed 재현성).
+- **Savings batching** (`assignment.savings_bundles`): begin with same-location groups. Merge by `estimate(A)+estimate(B)-estimate(A union B)` using NN travel and conveyor termination, with staging as the stated virtual start. Examine k-nearest-centre candidates (k=8), descending savings, lexicographic ties and request caps.
+- **Completion scheduling** (`assignment.completion_schedule`): inspect batches by descending estimated duration. Select the worker minimizing availability plus travel/handling/conveyor/unloading time. Handling includes 10/30 seconds and quantities. Predicted positions start at staging and update to the preceding NN route's nearest conveyor endpoint. The simulator respects `assigned_picker`.
+- **Variable splitting** (`ensure_task_count`): split the largest batch when task count is below worker count. This is a minimum-task-count policy, not general adaptive-duration batching.
+- **Limited LNS** (`lns.lns_improve`): remove q requests from a predicted bottleneck batch, alternating centre-distance and seeded-random selection, then repair and accept predicted overall completion improvement. Validate ownership/caps before commit; keep a valid plan at interruption. Iteration and wall-time limits are separate.
+- **Cost controls:** cached estimates keyed by start and request set, stage timing in `plan.phases`, and the original 15-second target. The original report described incremental insertion; archive review found whole `expected_makespan` calls inside insertion evaluation, so that stronger efficiency description is unverified.
 
-## 2. 개발 스크린 (202~208, p10·R480, fixed)
+The full suite passed **88 tests**, eight more than the prior stage. New checks cover savings partition/merging/determinism, completion availability and ownership, minimum-task splitting, LNS partition/interruption/predicted non-worsening, and fixed-mode replay. These checks do not resolve all LNS-to-execution propagation risks.
 
-| 단계 | C3 대비 | 판정 |
+## 2. Development screen
+
+Seeds 202-208, ten pickers, 480 requests, fixed mode:
+
+| Stage | Change versus C3 | Interpretation |
 |---|---|---|
-| S2 savings+balanced | **−19.71%** | 탈락 — 절약 병합이 군집 묶음을 만들지만 크기 불균형(편차 630s) 유발 |
-| S3 savings+completion | −11.95% | 탈락 — completion이 편차를 줄여도(448s) 회복 불충분 |
-| S3b chunk+completion | **+0.42%** | 유망 |
-| S4b +가변묶음+LNS | +0.42% | 추가 효과 없음(작업 수 충분해 가변 무발동, LNS는 추정만 개선) |
+| S2 savings + balanced | **-19.71%** | Rejected; compact groups accompanied by load spread around 630 seconds. |
+| S3 savings + completion | -11.95% | Rejected; spread reduced to about 448 seconds but insufficient recovery. |
+| S3b chunk + completion | **+0.42%** | Promising for further comparison. |
+| S4b plus variable splitting and LNS | +0.42% | No additional observed outcome; splitting inactive and LNS effect unresolved. |
 
-동결: S3b(=cap24+chunk+completion+n2r)와 S4b를 평가로. savings는 탈락 근거와 함께 기록.
+S3b (cap24/chunk/completion/n2r) and S4b were frozen for the next comparison. Savings remained a documented negative development result.
 
-## 3. 재사용 평가 집합의 후속 비교 (203~221, 6조건 × 10 seed; 전체 집계식)
+## 3. Follow-up on reused evaluation groups
 
-**S3b(chunk+completion) 대 C3(cap24+balanced+n2r)** — fixed / measured:
+Ten seeds 203-221 across six conditions; primary measure is aggregate completion improvement. Compare S3b with C3 (cap24/balanced/n2r).
 
-| 조건 | fixed | measured | 악화(fixed/measured) |
+| Condition | Fixed mode | Measured mode | Worse cases: fixed / measured |
 |---|---|---|---|
-| p10·R480 | **+0.84% [+0.30,+1.33]** / +13.6s | +2.91% / +47.4s | 0/10 · 1/10 |
-| 대형 76×80·R960 | **+0.57% [+0.02,+1.10]** / +19.6s | +1.72% / +59.4s | 0/10 · 1/10 |
-| p20·R960 | +0.23% [−0.39,+0.82] / +3.6s | +2.03% / +32.6s | 0/10 · 1/10 |
-| hot 집중·p10 | +0.26% [−0.23,+0.89] | +0.96% | — |
-| 포장70%·중복·p10 | +0.64% [−0.18,+1.42] | +1.92% | — |
-| **p20·R480(1작업/인)** | **−4.87% [−6.27,−3.46]** | −3.36% | 10/10 · 10/10 |
+| p10/R480 | **+0.84% [0.30,1.33]**, 13.6 seconds saved | +2.91%, 47.4 seconds | 0/10 / 1/10 |
+| Large 76 by 80 m/R960 | **+0.57% [0.02,1.10]**, 19.6 seconds | +1.72%, 59.4 seconds | 0/10 / 1/10 |
+| p20/R960 | +0.23% [-0.39,0.82], 3.6 seconds | +2.03%, 32.6 seconds | 0/10 / 1/10 |
+| Hotspot, p10 | +0.26% [-0.23,0.89] | +0.96% | Not listed |
+| Wrapped share 70%, duplicates, p10 | +0.64% [-0.18,1.42] | +1.92% | Not listed |
+| **p20/R480, one task per picker** | **-4.87% [-6.27,-3.46]** | -3.36% | 10/10 / 10/10 |
 
-- **S4b(+LNS·가변)의 fixed 결과는 S3b와 동일**이었다. 가변 묶음은 미발동이므로 효과를 평가하지 못했다. LNS는 변경 묶음과 담당 배정의 전파·예외·발급 이력을 확인하기 전까지 알고리즘 무효로 판정하지 않는다. 추정-실행 간극은 가설이며 후속 코드 검토에서 매핑 위험도 발견했다. 현재 추천에는 포함하지 않는다.
-- C3 대신 L1(cap12 기준) 대비로는 p10·R480 +5.35%, 대형 +11.75% 등 기존 보고 유지·소폭 상향.
-- 계산비용: completion 배정 추가 비용은 초기 계획에 ~0.02–0.3s(fixed 실행 측정).
-  대형·measured에서 초기 계획 실측 최대 79.4s로 15s 기준 초과 — C3도 유사 수준의
-  초기 계획 비용을 지니는 조건(요청 960의 묶음·배정 계산)으로 completion 고유
-  비용만은 아니지만, 공통 비용이라는 이유로 기준을 충족하는 것은 아니다. 예산 준수는 미확립이다.
+Fixed S4b results match S3b. Inactive splitting does not establish its ineffectiveness. LNS requires tracking changed groups, named owners, exceptions and final issued tasks before judging its algorithmic value. Planning-versus-execution mismatch is a hypothesis; archive review additionally identified order/assignment consistency risks. LNS is not recommended as part of the final candidate.
 
-## 4. 결론
+Against L1/cap12 instead of C3, the report gives p10/R480 about +5.35% and the large-layout condition about +11.75%. These have a different baseline from the table and must not be substituted for the incremental C3 comparison.
 
-> 기본 창고·480요청·10인에서 현재 cap24 조합(cap24+balanced+NN→2-opt→재삽입) 대비
-> **예상 종료시간 기반 배정으로 교체한 조합(cap24+chunk 묶음+completion 배정+동일 경로)**
-> 이 전체 종료시간을 추가로 평균 13.6초, 전체 집계 기준 0.84% [+0.30, +1.33] 줄였다
-> (measured +2.91%). 대형 창고 +0.57% [+0.02, +1.10], 20인·960요청 +0.23%[−0.39,+0.82].
-> 주요 차이는 묶음이 아니라 **배정 방식**(가용시각·직전 하차 위치 예측 반영)이었고
-> 추가 계산비용은 초 단위 이하. **20인·480요청(작업 1개/인)에서는 −4.87% 악화해
-> 관측 조건을 벗어나 일반화하지 않는다.** savings의 개발 악화는 기록하되 LNS의 무효성은 확정하지 않는다. 전체 조합은 조건부 개선을 보인 탐색 결과이며 기본 운영 알고리즘으로 채택하지 않는다.
+Completion assignment's reported additional initial computation is about 0.02-0.3 seconds in fixed-mode runs. Measured large-layout initial planning reaches **79.4 seconds**, exceeding 15 seconds. A similar baseline cost does not waive noncompliance or establish budget feasibility.
 
-## 5. 재현
+## 4. Qualified conclusion
+
+> For the default synthetic warehouse, 480 requests and ten pickers, replacing the cap24 candidate's balancing with availability/previous-unload-aware completion scheduling reduced fixed-mode completion by 13.6 seconds, aggregate 0.84% [0.30,1.33]. Measured improvement was 2.91%; keep timing modes separate. Large-layout fixed improvement was 0.57% [0.02,1.10], while twenty pickers/960 requests gave an interval including zero. Twenty pickers/480 requests worsened 4.87% in fixed mode. These are conditional exploratory gains, not a default operational recommendation. Savings had adverse development outcomes, splitting was inactive, and LNS ineffectiveness was not established.
+
+## 5. Reproduction
 
 ```powershell
 $env:PYTHONIOENCODING='utf-8'
-python -m unittest discover -s tests                      # 88 tests
-python -m simulation.experiments4 results dev-stages      # 개발 스크린
+python -m unittest discover -s tests
+python -m simulation.experiments4 results dev-stages
 python -m simulation.experiments4 results eval-all eval-measured
 ```
 
-## 6. 한계
+Those experiment commands run simulations. For a read-only saved-data summary, use `python -m simulation.archive_summary results/expansion-archive-summary-rerun.json`. Preserve archived outputs when resuming.
 
-- completion 배정의 p20·480 악화 원인은 기록(편차·연쇄 소멸 조건) 기반 가설로
-  통제 실험 미수행. "작업/인 ≥ 2일 때만 적용"은 여전히 미검증 규칙.
-- LNS 무효의 원인(추정-실제 간극)은 가설이며 regret-2 등 변형 미시험.
-- savings 묶음의 k=8·시작점=집결지 가정에 대한 민감도 미시험.
-- 대형·measured의 초기 계획 79.4s는 병렬 계획 미도입 조건의 한계.
+## 6. Limitations
+
+- Causes of p20/R480 deterioration are hypotheses; load spread, chained starts and computation change together. A tasks-per-worker >=2 selector is unvalidated.
+- LNS may have group/order/owner propagation problems; regret-2 and other repair variants were not tested. Unchanged outcomes do not establish no useful LNS exists.
+- Savings sensitivity to k=8 and the virtual staging start was not studied.
+- Sequential measured planning can exceed the budget; introducing parallel planning would change the computation-resource model.
+- Evaluation seed reuse, missing repeated same-input timing, synthetic geometry and excluded basket capacity limit generalization.

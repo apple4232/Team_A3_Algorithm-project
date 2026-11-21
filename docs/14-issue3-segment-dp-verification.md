@@ -6,7 +6,7 @@ Prepared on November 18, 2026 from the supplied verification report, its indepen
 
 The review covers reproduction of the development counts, fixed-boundary segment optimization, sweep coverage, route-distance checks, and comparison with a one-pass reinsertion search. The repository implementation used by the reproduction is `9c03abd`, with the same tree as `Sichan` at `7a9ab03`.
 
-검증 범위는 구간 DP의 예비 수치 재현, 구간 경계와 순회 방식, 경로 검증, 시간 중단 처리, 재삽입 탐색과의 비용·효과 비교입니다.
+The scope includes preliminary-result reproduction, segment boundaries and sweep coverage, route validation, interruption handling, and distance/runtime trade-offs against reinsertion.
 
 The numerical tables below were checked against the available per-task JSONL outputs during preparation of this document. The complete performance experiment was not rerun during this documentation task. The implementation and measurements are an independent reproduction of the issue specification. The issue author's prototype source and per-task measurements were unavailable to that review.
 

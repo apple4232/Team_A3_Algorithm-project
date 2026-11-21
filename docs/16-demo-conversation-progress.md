@@ -140,3 +140,4 @@
 - `Sichan` 브랜치를 GitHub에 푸시했고 Python 테스트 44개와 데모 필터 테스트를 통과했다. GitHub `main`은 변경하지 않았다.
 - 다운로드 안내는 현재 코드와 데이터가 있는 `Sichan` 브랜치를 가리키도록 했다. 기본 브랜치가 갱신되면 안내를 다시 조정할 수 있다.
 - 충돌 처리 중 macOS Finder가 추적 중인 `.DS_Store`를 계속 변경하여 임시 보관함에 Finder 메타데이터 세 버전이 남았다. 현재 변경 중인 Finder 파일을 덮어쓰지 않기 위해 자동으로 적용·삭제하지 않았다.
+- Vercel의 `didtlcks0228-6663's projects` 팀에서 `picking-lab-demo` 프로젝트 생성을 시도했으나 API가 403 `You don't have permission to create the project`를 반환했다. 이 환경에 Vercel CLI도 없어 동일 작업의 CLI 대안은 실행하지 못했다. 실제 Vercel 프로젝트·배포 URL은 생성되지 않았다.

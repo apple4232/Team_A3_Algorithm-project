@@ -215,7 +215,7 @@ The experiment workflow and offline selector evaluation are described in [Role B
 Clone the repository and start the saved-results viewer (Python 3.10 or newer is required):
 
 ```sh
-git clone https://github.com/apple4232/Team_A3_Algorithm-project.git
+git clone -b Sichan https://github.com/apple4232/Team_A3_Algorithm-project.git
 cd Team_A3_Algorithm-project
 python3 -m demo
 ```

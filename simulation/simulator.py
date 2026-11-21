@@ -103,6 +103,12 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner, stop_check=None)
     def candidates():
         return [t for t in state.tasks if t.status in ("pending", "prerouted")]
 
+    def candidates_for(pid):
+        """담당 지정(completion 배정)이 있으면 그 작업자의 작업을 우선."""
+        mine = [t for t in candidates() if t.assigned_picker in (None, pid)]
+        own = [t for t in mine if t.assigned_picker == pid]
+        return own + [t for t in mine if t.assigned_picker is None]
+
     def pick_seconds_at(task, node):
         total = 0.0
         for r in task.requests:
@@ -199,7 +205,8 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner, stop_check=None)
         return best
 
     def preroute_next(just_issued, now):
-        open_tasks = candidates()
+        open_tasks = candidates_for(just_issued.assigned_picker if hasattr(just_issued, "assigned_picker") else None)
+        open_tasks = open_tasks or candidates()
         nxt = next((t for t in open_tasks if t.status == "pending"), None)
         if nxt is None or not just_issued.route:
             return
@@ -208,7 +215,7 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner, stop_check=None)
         schedule_planner(now)
 
     def next_task_for_picker(p, now):
-        open_tasks = candidates()
+        open_tasks = candidates_for(p["id"])
         if not open_tasks:
             p["state"], p["free_since"] = "done", now
             return
@@ -296,9 +303,23 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner, stop_check=None)
         elif kind == "PLAN_DONE":
             planner_free_at[0] = now
             if payload["kind"] == "INITIAL":
+                # 담당 지정이 있으면 그 작업자의 첫 작업을, 없으면 순서대로
+                assigned_map = defaultdict(list)
+                for task in state.tasks:
+                    if task.assigned_picker is not None:
+                        assigned_map[task.assigned_picker].append(task)
+                used = set()
+                for pid in range(n_pickers):
+                    mine = [t for t in assigned_map.get(pid, []) if t.status == "pending"]
+                    if mine:
+                        task = mine[0]
+                        used.add(task.tid)
+                        task.status, task.reserved_picker = "reserved", pid
+                        enqueue_op(0, {"kind": "ROUTE", "tid": task.tid, "picker": pid})
                 for i, task in enumerate(state.tasks[:n_pickers]):
-                    task.status, task.reserved_picker = "reserved", i
-                    enqueue_op(0, {"kind": "ROUTE", "tid": task.tid, "picker": i})
+                    if task.status == "pending" and task.tid not in used:
+                        task.status, task.reserved_picker = "reserved", i
+                        enqueue_op(0, {"kind": "ROUTE", "tid": task.tid, "picker": i})
                 if improve_rounds_left > 0 and len(candidates()) > 1:
                     enqueue_op(2, {"kind": "IMPROVE"})
             elif payload["kind"] == "ROUTE":
@@ -433,7 +454,9 @@ def simulate(run_cfg, warehouse, requests, planner_cls=Planner, stop_check=None)
                  "moves_applied": plan_stats["moves_applied"],
                  "improve_discarded": plan_stats["improve_discarded"],
                  "aborts": plan_stats["aborts"],
-                 "adoption_log": adoption_log},
+                 "adoption_log": adoption_log,
+                 "phases": getattr(planner, "phases", {}),
+                 "lns_log": getattr(planner, "lns_log", [])},
         "lookahead": {"decisions": lookahead_stats["decisions"],
                       "nondefault": lookahead_stats["nondefault"],
                       "wall_seconds": round(lookahead_stats["wall_seconds"], 6),

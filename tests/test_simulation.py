@@ -8,6 +8,7 @@
 import random
 import sys
 import unittest
+from collections import defaultdict
 from dataclasses import replace
 from pathlib import Path
 
@@ -36,7 +37,10 @@ def run_cfg(**kw):
                                   "congestion_aware", "requests_per_task",
                                   "improvement_eval_budget", "move_swap_rounds",
                                   "congestion_mode", "congestion_threshold_s",
-                                  "dropoff_lookahead", "lookahead_candidates")})
+                                  "dropoff_lookahead", "lookahead_candidates",
+                                  "bundling", "variable_cap", "lns", "lns_iters",
+                                  "lns_time_budget_s", "lns_remove_q",
+                                  "max_task_seconds")})
     sim = replace(base.sim, **{k: fields.pop(k) for k in list(fields) if k in
                                ("pickers", "seed", "compute_mode",
                                 "fixed_initial_plan_s", "fixed_wave_s")})
@@ -664,6 +668,137 @@ class TestEvidenceFeatures(unittest.TestCase):
                                 assignment="balanced", requests_per_task=6,
                                 combo="nn", move_swap=False)
         self.assertAlmostEqual(m_auto["makespan_s"], m_off["makespan_s"], places=6)
+
+
+
+
+class TestThirdRound(unittest.TestCase):
+    """3차: savings 묶음·completion 배정·가변 묶음·제한적 LNS의 정확성."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.wh = build_warehouse(WarehouseConfig())
+
+    def run_sim(self, requests, **kw):
+        cfg = run_cfg(**kw)
+        return simulate(cfg, self.wh, requests)
+
+    def test_savings_partition_caps_determinism(self):
+        from simulation.assignment import savings_bundles
+        rng = random.Random(61)
+        reqs = generate_requests(RunConfig(total_requests=100), self.wh, rng)
+        cfg = PlanConfig(requests_per_task=12)
+        a = savings_bundles(reqs, cfg, self.wh, self.wh.staging, PickConfig(), 1.0)
+        b = savings_bundles([dict(r) for r in reqs], cfg, self.wh, self.wh.staging,
+                            PickConfig(), 1.0)
+        flat = sorted(r["id"] for x in a for r in x)
+        self.assertEqual(flat, sorted(r["id"] for r in reqs))
+        for x in a:
+            self.assertLessEqual(len(x), 12)
+        self.assertEqual([sorted(r["id"] for r in x) for x in a],
+                         [sorted(r["id"] for r in x) for x in b])  # 결정론
+
+    def test_savings_same_location_merged(self):
+        from simulation.assignment import savings_bundles
+        reqs = [one_request((8, 6), 2, "easy", 0), one_request((8, 6), 1, "packed", 1)]
+        out = savings_bundles(reqs, PlanConfig(requests_per_task=4), self.wh,
+                              self.wh.staging, PickConfig(), 1.0)
+        self.assertEqual(len(out), 1)  # 동일 위치는 묶임(방문 병합)
+
+    def test_completion_schedule_properties(self):
+        from simulation.assignment import completion_schedule
+        rng = random.Random(63)
+        reqs = generate_requests(RunConfig(total_requests=60), self.wh, rng)
+        bundles = chunk_requests(reqs, PlanConfig(requests_per_task=12))
+        ordered, assign, finish = completion_schedule(bundles, self.wh,
+                                                      self.wh.staging, PickConfig(),
+                                                      1.0, 4)
+        self.assertEqual(len(ordered), len(bundles))
+        self.assertTrue(all(0 <= j < 4 for j in assign))
+        # 가용시각 단조: 각 작업자의 배정 순서대로 finish는 비감소
+        by_picker = defaultdict(list)
+        for b, j, f in zip(ordered, assign, finish):
+            by_picker[j].append(f)
+        for values in by_picker.values():
+            self.assertEqual(values, sorted(values))
+
+    def test_completion_mode_end_to_end_partition(self):
+        rng = random.Random(65)
+        reqs = generate_requests(RunConfig(total_requests=48), self.wh, rng)
+        m = self.run_sim(reqs, pickers=4, assignment="completion",
+                         combo="nn-2opt-reinsert", requests_per_task=12,
+                         move_swap=False, compute_mode="fixed")
+        flat = [rid for t in m["task_records"] for rid in t["requests"]]
+        self.assertEqual(sorted(flat), sorted(r["id"] for r in reqs))
+
+    def test_variable_cap_ensures_min_tasks(self):
+        from simulation.assignment import ensure_task_count
+        rng = random.Random(67)
+        reqs = generate_requests(RunConfig(total_requests=30), self.wh, rng)
+        big = [reqs]  # 묶음 1개
+        out = ensure_task_count(big, PlanConfig(requests_per_task=12), self.wh,
+                                self.wh.staging, PickConfig(), 1.0, 5)
+        self.assertGreaterEqual(len(out), 5)
+        flat = sorted(r["id"] for x in out for r in x)
+        self.assertEqual(flat, sorted(r["id"] for r in reqs))
+        for x in out:
+            self.assertLessEqual(len(x), 12)
+
+    def test_lns_preserves_partition_and_respects_abort(self):
+        from simulation.lns import lns_improve
+        from simulation.routes import Interrupted as RStop
+
+        class Boom(RStop):
+            pass
+        rng = random.Random(69)
+        reqs = generate_requests(RunConfig(total_requests=60), self.wh, rng)
+        bundles = chunk_requests(reqs, PlanConfig(requests_per_task=12))
+        ids = [r["id"] for b in bundles for r in b]
+        run = RunConfig(sim=SimConfig(pickers=4, seed=1, compute_mode="fixed"),
+                        plan=PlanConfig(requests_per_task=12, lns=True,
+                                        lns_iters=5, lns_remove_q=3))
+        # 정상 실행
+        out, stats = lns_improve(bundles, self.wh, self.wh.staging, run)
+        self.assertEqual(sorted(r["id"] for b in out for r in b), sorted(ids))
+        for b in out:
+            self.assertLessEqual(len(b), 12)
+        # 즉시 중단: 원본 보존(유효 계획 유지)
+        calls = {"n": 0}
+
+        def stop():
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise Boom()
+        out2, stats2 = lns_improve([list(b) for b in bundles], self.wh,
+                                   self.wh.staging, run, stop_check=stop)
+        self.assertEqual(sorted(r["id"] for b in out2 for r in b), sorted(ids))
+        self.assertEqual(stats2["aborts"], 1)
+
+    def test_lns_never_worsens_estimate(self):
+        from simulation.assignment import expected_makespan
+        from simulation.lns import lns_improve
+        rng = random.Random(71)
+        reqs = generate_requests(RunConfig(total_requests=60), self.wh, rng)
+        bundles = chunk_requests(reqs, PlanConfig(requests_per_task=12))
+        run = RunConfig(sim=SimConfig(pickers=4, seed=1, compute_mode="fixed"),
+                        plan=PlanConfig(requests_per_task=12, lns_iters=10))
+        out, _ = lns_improve(bundles, self.wh, self.wh.staging, run)
+        before = expected_makespan(bundles, self.wh, self.wh.staging, PickConfig(), 1.0, 4)
+        after = expected_makespan(out, self.wh, self.wh.staging, PickConfig(), 1.0, 4)
+        self.assertLessEqual(after, before + 1e-6)  # 채택은 추정 종료 감소만
+
+    def test_new_pipeline_reproducible_fixed(self):
+        rng = random.Random(73)
+        reqs = generate_requests(RunConfig(total_requests=36), self.wh, rng)
+        keys = ("makespan_s", "total_walk_m", "task_records")
+        outs = []
+        for _ in range(2):
+            m = self.run_sim([dict(r) for r in reqs], pickers=3, assignment="completion",
+                             combo="nn-2opt-reinsert", bundling="savings",
+                             requests_per_task=12, move_swap=False, lns=True,
+                             lns_iters=5, seed=73, compute_mode="fixed")
+            outs.append({k: m[k] for k in keys})
+        self.assertEqual(outs[0], outs[1])
 
 
 def to_iter(n):

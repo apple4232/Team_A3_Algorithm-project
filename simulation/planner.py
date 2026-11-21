@@ -11,8 +11,9 @@
 import time
 from dataclasses import dataclass, field
 
-from .assignment import (chunk_requests, improve_assignment, rebalance_chunks,
-                         roundrobin_chunks, task_estimate)
+from .assignment import (chunk_requests, completion_schedule, ensure_task_count,
+                         improve_assignment, rebalance_chunks, roundrobin_chunks,
+                         savings_bundles, task_estimate)
 from .routes import RouteContext, improve as improve_route
 
 VALID_STATUSES = ("pending", "prerouted", "reserved", "issued", "done")
@@ -25,6 +26,7 @@ class TaskPlan:
     status: str = "pending"           # pending → prerouted → issued → done
     route: list | None = None         # 방문 순서(발급 시 확정)
     reserved_picker: int | None = None
+    assigned_picker: int | None = None   # completion 배정이 지정한 담당 작업자
     preroute_start: tuple | None = None
     est_time: float = 0.0
     pred_finish: float | None = None
@@ -66,6 +68,8 @@ class Planner:
         self.warehouse = warehouse
         self.mode = run_cfg.sim.compute_mode
         self.wall_total = 0.0
+        self.phases = {}
+        self.lns_log = []
         self.sim_delay_total = 0.0
         self.ops_count = 0
 
@@ -82,26 +86,75 @@ class Planner:
         return result, wall
 
     def initial_plan(self, requests, stop_check=None, log=None):
-        """전체 요청 → (작업들, 소요). 거리 청크 → (선택) 균형 → (선택) 이동·교환."""
+        """전체 요청 → (작업들, 소요). 단계별 계산시간을 self.phases에 기록.
+
+        파이프라인: 묶음(chunk|savings) → 배정(spatial|balanced|roundrobin|completion)
+        → (선택) 가변 묶음 분할 → (선택) 이동·교환(off 권장) → (선택) LNS.
+        completion 배정은 묶음별 담당 작업자를 지정하고 이동·교환을 건너뛴다
+        (발급 예약 변경 범위를 LNS와 구분하기 위함).
+        """
+        from time import perf_counter
         plan_cfg = self.run.plan
         pick_cfg = self.run.pick
         staging = self.warehouse.staging
         speed = pick_cfg.walk_speed_m_s
+        self.phases = {}
+
+        def timed_phase(name, fn):
+            t0 = perf_counter()
+            out = fn()
+            self.phases[name] = round(perf_counter() - t0, 4)
+            return out
+
+        lns_log = []
 
         def compute():
-            if plan_cfg.assignment == "roundrobin":
-                groups = roundrobin_chunks(requests, plan_cfg, staging)
-            else:
-                groups = chunk_requests(requests, plan_cfg)
-            if plan_cfg.assignment == "balanced":
-                groups = rebalance_chunks(groups, self.warehouse, staging, pick_cfg,
-                                          speed, plan_cfg)
-            if plan_cfg.move_swap:
-                groups = improve_assignment(groups, self.warehouse, staging, self.run,
-                                            stop_check=stop_check, log=log)
-            return groups
+            def do_bundle():
+                if getattr(plan_cfg, "bundling", "chunk") == "savings":
+                    return savings_bundles(requests, plan_cfg, self.warehouse, staging,
+                                           pick_cfg, speed, stop_check=stop_check)
+                if plan_cfg.assignment == "roundrobin":
+                    return roundrobin_chunks(requests, plan_cfg, staging)
+                return chunk_requests(requests, plan_cfg)
 
-        groups, wall = self._timed(compute)
+            groups = timed_phase("bundling", do_bundle)
+            if plan_cfg.assignment == "balanced":
+                groups = timed_phase("balance",
+                                     lambda: rebalance_chunks(groups, self.warehouse,
+                                                              staging, pick_cfg, speed,
+                                                              plan_cfg))
+            if getattr(plan_cfg, "variable_cap", False):
+                groups = timed_phase("variable_cap",
+                                     lambda: ensure_task_count(groups, plan_cfg,
+                                                               self.warehouse, staging,
+                                                               pick_cfg, speed,
+                                                               self.run.sim.pickers))
+            assign = None
+            if plan_cfg.assignment == "completion":
+                ordered, assign, _ = timed_phase("completion",
+                                                 lambda: completion_schedule(
+                                                     groups, self.warehouse, staging,
+                                                     pick_cfg, speed,
+                                                     self.run.sim.pickers))
+                groups = ordered
+            elif plan_cfg.move_swap:
+                groups = timed_phase("move_swap",
+                                     lambda: improve_assignment(groups, self.warehouse,
+                                                                staging, self.run,
+                                                                stop_check=stop_check,
+                                                                log=log))
+            if getattr(plan_cfg, "lns", False):
+                def do_lns():
+                    from .lns import lns_improve
+                    out, stats = lns_improve(groups, self.warehouse, staging,
+                                             self.run, stop_check=stop_check,
+                                             log=lns_log)
+                    self.phases["lns_stats"] = stats
+                    return out
+                groups = timed_phase("lns", do_lns)
+            return groups, assign
+
+        (groups, assign), wall = self._timed(compute)
         if self.mode == "fixed":
             duration = self.run.sim.fixed_initial_plan_s
         else:
@@ -111,11 +164,14 @@ class Planner:
         tasks = []
         for i, group in enumerate(groups):
             est = task_estimate(group, self.warehouse, staging, pick_cfg, speed)
-            tasks.append(TaskPlan(tid=i, requests=list(group), est_time=est["time_s"]))
+            t = TaskPlan(tid=i, requests=list(group), est_time=est["time_s"])
+            t.assigned_picker = assign[i] if assign else None
+            tasks.append(t)
         # 긴 작업 먼저 발급(결정론적 정렬)
         tasks.sort(key=lambda t: (-t.est_time, t.tid))
         for i, t in enumerate(tasks):
             t.tid = i
+        self.lns_log = lns_log
         return tasks, duration
 
     def route_for(self, task, start_node, stop_check=None):

@@ -61,6 +61,15 @@ class PlanConfig:
     improvement_eval_budget: int = 20000   # 작업당 평가 횟수 협력적 상한
     segdp_window: int = 6
     segdp_step: int = 3
+    # --- 3차 입증: 묶음 구성·배정·LNS ---
+    bundling: str = "chunk"            # chunk((x,y) 정렬 청크)|savings(거리 절약 병합)
+    max_task_seconds: float | None = None  # 묶음 예상 소요 상한(선택)
+    variable_cap: bool = False         # 작업 수 < 작업자 수일 때 최대 묶음 분할
+    lns: bool = False                  # 병목 제한 LNS(계획 시점, 미발급 묶음만)
+    lns_iters: int = 20
+    lns_time_budget_s: float = 2.0
+    lns_remove_q: int = 4
+    lns_seed: int = 0
 
 
 @dataclass(frozen=True)

@@ -50,6 +50,18 @@ class DemoTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 paths_for(broken, self.task)
 
+    def test_additional_records_are_loaded(self):
+        directory = Path(self.temp.name)
+        row = json.loads((directory / 'eval-request.jsonl').read_text())
+        row['algorithm'] = 'nn+2opt+reinsert'
+        extra = directory / 'eval-request-additional.jsonl'
+        try:
+            extra.write_text(json.dumps(row) + '\n')
+            names = [r['algorithm'] for r in Dataset(directory).detail(self.task['id'], 'request')['results']]
+            self.assertIn('nn+2opt+reinsert', names)
+        finally:
+            extra.unlink()
+
     def test_f_h_pair_ids_and_filters(self):
         self.assertEqual(pair_id(self.task, 'F'), '101:3:paired-near:0')
         self.assertEqual(pair_id(self.task, 'H'), '101:3:paired-far:1')
@@ -93,6 +105,17 @@ class DemoTests(unittest.TestCase):
                 self.assertEqual(json.load(response)[0]['id'], self.task['id'])
             with urlopen(base + '/api/detail?id=101%3A3%3Apaired-far%3A0&mode=request') as response:
                 self.assertEqual(json.load(response)['results'][0]['algorithm'], 'nn')
+            with urlopen(base + '/api/aggregate?split=eval&pair=F') as response:
+                self.assertTrue(all(row['attempts'] == 0 for row in json.load(response)))
+            paired_id = pair_id(self.task, 'F')
+            self.data.tasks[paired_id] = dict(self.task, id=paired_id, pattern='paired-near')
+            self.data.rows['request'][paired_id] = self.data.rows['request'][self.task['id']]
+            try:
+                with urlopen(base + '/api/aggregate?split=eval&pattern=paired-far&pair=F') as response:
+                    self.assertEqual(next(row for row in json.load(response) if row['algorithm'] == 'nn')['attempts'], 1)
+            finally:
+                del self.data.tasks[paired_id]
+                del self.data.rows['request'][paired_id]
             body = json.dumps({'id': self.task['id'], 'algorithms': ['nn']}).encode()
             request = Request(base + '/api/recalculate', data=body,
                               headers={'Content-Type': 'application/json', 'Origin': 'https://example.com'})

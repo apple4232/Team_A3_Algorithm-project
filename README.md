@@ -4,7 +4,7 @@ This project asks a practical question: **when one picker must collect items and
 
 The picker starts at `S`, visits every required location in `P`, and finishes at `C`. The project compares route distance and computation time. Its longer-term goal is to build simple algorithm-selection rules from experiments, rather than assume one method is best for every order.
 
-**Current status - November 6, 2026:** the warehouse model, shortest-path layer, routing algorithms, and correctness checks are implemented. Role B experiment tools and an exploratory workload-selection study are implemented; the UI remains planned.
+**Current status - November 20, 2026:** the warehouse model, routing algorithms, experiment tools, offline selection study, and local demonstration are implemented. The request runner uses a manually selected algorithm; multi-picker simulation remains future work.
 
 ## 1. What does one task mean?
 
@@ -60,7 +60,7 @@ The experiment package contains an offline rule trainer and held-out policy eval
 | Request execution | Manually specified candidate, an NN fallback route, and stage timings |
 | Verification | Automated routing and experiment tests, including exact-solution agreement and failure handling |
 
-The experiment package provides feature extraction, seeded A-H workload views, batch measurements and offline selection rules. The production request runner has not integrated those rules, and Streamlit remains future work. See [Role B experiments](docs/08-role-b-experiments.md).
+The experiment package provides feature extraction, seeded A-H workload views, batch measurements and offline selection rules. The production request runner has not integrated those rules, and A local demonstration is available below. See [Role B experiments](docs/08-role-b-experiments.md).
 
 ### The warehouse
 
@@ -87,6 +87,9 @@ Distances follow aisle centerlines. Horizontal edges exist only on the three cro
 | `ca-plus` | Minimizes `d(current, item) + coefficient * d(item, C)` |
 | `ca-minus` | Minimizes `d(current, item) - coefficient * d(item, C)` |
 | `nn+2opt` | Improves an NN order |
+| `nn+2opt+reinsert` | Improves the NN + 2-opt order by moving one location at a time |
+| `nn+2opt+reinsert-twice` | Applies reinsertion twice |
+| `nn+2opt+reinsert+segment-dp` | Applies reinsertion, then optimizes small consecutive segments with DP |
 | `ca-plus+2opt` | Improves a CA-plus order |
 | `ca-minus+2opt` | Improves a CA-minus order |
 
@@ -205,18 +208,39 @@ The November 2 documents retain the earlier research design. The baseline and co
 
 Source code is in `picking/`; correctness tests are in `tests/`.
 
-The experiment workflow and offline selector evaluation are described in [Role B experiments](docs/08-role-b-experiments.md). Production integration and a UI remain separate work.
+The experiment workflow and offline selector evaluation are described in [Role B experiments](docs/08-role-b-experiments.md). Automatic selection in the request runner remains future work.
 
 ## Local demonstration
 
-Start the saved-results viewer from the repository root:
+Clone the repository and start the saved-results viewer (Python 3.10 or newer is required):
+
+```sh
+git clone https://github.com/apple4232/Team_A3_Algorithm-project.git
+cd Team_A3_Algorithm-project
+python3 -m demo
+```
+
+If you already have the repository, start it from the repository root:
 
 ```sh
 python3 -m demo
 ```
 
-Open `http://127.0.0.1:8765/` in a browser. Python 3 is the only runtime dependency. Use `--port 8766` if the default port is occupied. The server is available only on this computer; stop it with Ctrl+C.
+Open `http://127.0.0.1:8765/` in a browser. Python is the only runtime dependency. Use `--port 8766` if the default port is occupied. The server is available only on this computer; stop it with Ctrl+C.
 
-The page compares the stored candidate or complete-request records and animates reconstructed aisle paths. A–H are overlapping experimental views. F and H automatically select the matching task on the second map; other views compare two algorithms on the same task. The recalculation button executes only the selected candidates, retains the saved data, and labels newly measured times separately. Conditions and timeouts can change the result. The graph animation is explanatory, not a measurement of physical walking time.
+The page compares the stored candidate or complete-request records and animates reconstructed aisle paths. F and H automatically select the matching task on the second map; other views compare two algorithms on the same task. Local recalculation runs all algorithms across all seeds matching the other filters, retains the saved data, and labels newly measured times separately. Conditions and timeouts can change the result. The graph animation is explanatory, not a measurement of physical walking time.
 
-The viewer requires `results/full/tasks.jsonl`, `rules.json`, and the development/evaluation candidate/request JSONL files. If they are unavailable, follow [Role B experiments](docs/08-role-b-experiments.md) to recreate the data, placing the output in `results/full`. The files are large and loading takes a few seconds. The UI never rewrites the experiment records.
+The viewer requires `results/full/tasks.jsonl`, `rules.json`, and the development/evaluation candidate/request JSONL files. The four `*-additional.jsonl` files provide the newer algorithms' saved results; without them those results will be missing. The files are large and loading takes a few seconds. The UI never rewrites the experiment records.
+
+## Static online demonstration
+
+The static build displays saved results only; the local demo above retains recalculation. To build a standalone copy, ensure all four `*-additional.jsonl` files are present and run from the repository root:
+
+```sh
+python3 -m demo.export_static public
+python3 -m http.server 8767 --directory public
+```
+
+Open `http://127.0.0.1:8767/`. The exporter refuses an existing output directory and fails if any result is missing; choose a new directory for another local build. `vercel.json` configures the same export for a Vercel Git build. Source code and every required data file must be included in the connected repository before that build can succeed. The online page links to this repository for local recalculation, so make sure the published GitHub version includes the current code and data before sharing it.
+
+NN remains the distance baseline. Budgeted improvement summaries pair only results completed within budget; request records also report a separate reference comparison when a validated NN route exists after a timeout, including pair and timeout counts. Candidate-only records do not supply a stored validated path for that reference.

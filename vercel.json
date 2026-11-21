@@ -1,0 +1,5 @@
+{
+  "framework": null,
+  "buildCommand": "python3 -m demo.export_static public",
+  "outputDirectory": "public"
+}

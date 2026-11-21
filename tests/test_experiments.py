@@ -81,6 +81,24 @@ class ExperimentTests(unittest.TestCase):
         candidate = list(run([held], 1, 1, 'candidate'))
         self.assertEqual(views(candidate)['A_exact_agreement']['distance_mismatches'], 0)
 
+    def test_nn_budget_and_validated_reference_are_separate(self):
+        task = {'id': '1', 'group': 'g'}
+        def row(name, result):
+            return {'task': task, 'features': {'n': 2, 'pattern': 'example'},
+                    'algorithm': name, 'result': result}
+        other = row('dp', {'status': 'completed', 'distance': 90})
+        nn = row('nn', {'status': 'timeout', 'distance': 100, 'budget_exceeded': True,
+                        'returned_algorithm': 'nn', 'order': [[1, 0]], 'path': [[0, 0], [1, 0]]})
+        report = summarize([nn, other])['dp']
+        self.assertEqual(report['nn_pair_count'], 0)
+        self.assertEqual(report['nn_reference_pair_count'], 1)
+        self.assertEqual(report['nn_reference_over_budget_count'], 1)
+        self.assertEqual(report['nn_reference_mean_improvement_percent'], 10)
+        nn['result']['path'] = None
+        self.assertEqual(summarize([nn, other])['dp']['nn_reference_pair_count'], 0)
+        nn['result'].update(status='completed', budget_exceeded=True)
+        self.assertEqual(summarize([nn, other])['dp']['nn_pair_count'], 0)
+
     def test_summary_gap_and_failed_attempt(self):
         task = {'id': '1', 'group': 'g'}
         def row(name, distance, status='completed', optimal=False):

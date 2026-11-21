@@ -1,0 +1,789 @@
+{
+  "purpose": "Archive inventory and saved-data reaggregation; no simulation rerun",
+  "round_record_counts_jsonl": {
+    "multi": 762,
+    "multi2": 474,
+    "multi3-dev": 220,
+    "multi3-eval": 420,
+    "multi4-dev": 20,
+    "multi4-eval": 360
+  },
+  "first_round_additional_stress_array_records": 24,
+  "total_records_including_stress_array": 2280,
+  "files": [
+    {
+      "path": "results/multi/congestion-hot.jsonl",
+      "records": 24,
+      "sha256_lf_normalized": "71c9034add4c969abea2f78e240802cb4c1a7b5b146bd63ec0d81b8763e04603"
+    },
+    {
+      "path": "results/multi/congestion.jsonl",
+      "records": 24,
+      "sha256_lf_normalized": "ddd31b45f630f4e202de05eb819a5c88bf2da01a7f352a6ee545344fb5847716"
+    },
+    {
+      "path": "results/multi/main.jsonl",
+      "records": 504,
+      "sha256_lf_normalized": "77d0e70f23f3908da30f36ad1f2a57b0dc59f4ce41f0c70ce8064e595ead4464"
+    },
+    {
+      "path": "results/multi/per-picker.jsonl",
+      "records": 54,
+      "sha256_lf_normalized": "b4b8a392dd8e46164c11622cc23665b68624970a2c6f75e2fb8f702a3fef5dbf"
+    },
+    {
+      "path": "results/multi/sensitivity.jsonl",
+      "records": 156,
+      "sha256_lf_normalized": "e32ae513359b08226ae20eb41400d5485d671411ed706d87f35702f14033ef5a"
+    },
+    {
+      "path": "results/multi2/congestion.jsonl",
+      "records": 96,
+      "sha256_lf_normalized": "5cd7b5a832d095f0189542bcaea9cd1039fd25a5c750341ab3559d1f1d13e88b"
+    },
+    {
+      "path": "results/multi2/continuous20.jsonl",
+      "records": 84,
+      "sha256_lf_normalized": "8814dc662303fd293dc79ce186d6f6ea913df9b7d5ae41521394f94d694c0a04"
+    },
+    {
+      "path": "results/multi2/fixed-total.jsonl",
+      "records": 126,
+      "sha256_lf_normalized": "d706ee96ace529eebe015ffebd18350e4f028be791a0d09d6eba0f040faa923e"
+    },
+    {
+      "path": "results/multi2/fixed20.jsonl",
+      "records": 84,
+      "sha256_lf_normalized": "0755e51719ccf62eec91dcbd8215d2edff0fb1422772bc695d2f529a1c398d4d"
+    },
+    {
+      "path": "results/multi2/per-picker.jsonl",
+      "records": 84,
+      "sha256_lf_normalized": "cb9059745c7c0318d4a68df5876d2d63fff50740e9a506d5ae21dc226d05b5f3"
+    },
+    {
+      "path": "results/multi3-dev/dev-bundle.jsonl",
+      "records": 72,
+      "sha256_lf_normalized": "d77887a89b49656f2551843d3c82998d7abdbdf53823dcd407a23822972d34dd"
+    },
+    {
+      "path": "results/multi3-dev/dev-ladder.jsonl",
+      "records": 84,
+      "sha256_lf_normalized": "573b8e911b33796e122e418e48df30f5f887760a936231ad30ced8231993a989"
+    },
+    {
+      "path": "results/multi3-dev/dev-lookahead.jsonl",
+      "records": 16,
+      "sha256_lf_normalized": "c260bfd8993a7149411581d2693ada3ab8236f55ddd9d95704db5709c1c37343"
+    },
+    {
+      "path": "results/multi3-dev/dev-threshold.jsonl",
+      "records": 48,
+      "sha256_lf_normalized": "c1762b27ee5d3e0835f9a4c79e36b41194153d61f94d79cca9feb1f8f59061e0"
+    },
+    {
+      "path": "results/multi3-eval/eval-ladder.jsonl",
+      "records": 300,
+      "sha256_lf_normalized": "7c8bb50877a7a9916553e91f40ccc753cfb1f4448c23a10e6ef39b76540a2843"
+    },
+    {
+      "path": "results/multi3-eval/eval-large.jsonl",
+      "records": 60,
+      "sha256_lf_normalized": "8bf164cb379498d67b1b5c7a7c626253a25d2ad3a9accce6b08e5777f16a1cd8"
+    },
+    {
+      "path": "results/multi3-eval/eval-workload.jsonl",
+      "records": 60,
+      "sha256_lf_normalized": "7d06c9e87804a38219925579820f85195782b45dd76c722f715eefc7e97b0784"
+    },
+    {
+      "path": "results/multi4-dev/dev-stages.jsonl",
+      "records": 20,
+      "sha256_lf_normalized": "c5a6e84454c19138149db6f226b555553824830497b607f1006d05f070c98d28"
+    },
+    {
+      "path": "results/multi4-eval/eval-all.jsonl",
+      "records": 240,
+      "sha256_lf_normalized": "a403c0d95d2dfc47deeda8877c43114fc30f06390d4e874f86b2cef6eef710fa"
+    },
+    {
+      "path": "results/multi4-eval/eval-measured.jsonl",
+      "records": 120,
+      "sha256_lf_normalized": "dbf2a92a1334dba60c84b07126561d5108e7a2a7e419a7b898931c41db8ef066"
+    },
+    {
+      "path": "results/multi/congestion-stress.json",
+      "records": 24,
+      "sha256_lf_normalized": "7bc3fa816304b6b248192a18bba9e7d36638b14e172ef61ff65fe9666e95e720"
+    }
+  ],
+  "reused_evaluation_seed_ids_round3_round4": [
+    203,
+    205,
+    207,
+    209,
+    211,
+    213,
+    215,
+    217,
+    219,
+    221
+  ],
+  "round4_vs_cap24_comparisons": [
+    {
+      "condition": [
+        "hot-p10-R480",
+        "eval",
+        10,
+        480,
+        "warehouse-u-belt-v1",
+        "fixed"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S3b-chunk-comp",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": 0.26414108950666837,
+      "aggregate_ci95_seed_bootstrap": [
+        -0.22569447717883698,
+        0.8885913849676353
+      ],
+      "mean_per_run_percent": 0.25675763463844486,
+      "mean_seconds_saved": 4.207999999999993,
+      "improved": 6,
+      "tied": 1,
+      "worse": 3,
+      "max_candidate_plan_wall_seconds": 7.239342
+    },
+    {
+      "condition": [
+        "hot-p10-R480",
+        "eval",
+        10,
+        480,
+        "warehouse-u-belt-v1",
+        "fixed"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S4b-var-LNS",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": 0.26414108950666837,
+      "aggregate_ci95_seed_bootstrap": [
+        -0.22569447717883698,
+        0.8885913849676353
+      ],
+      "mean_per_run_percent": 0.25675763463844486,
+      "mean_seconds_saved": 4.207999999999993,
+      "improved": 6,
+      "tied": 1,
+      "worse": 3,
+      "max_candidate_plan_wall_seconds": 8.106366
+    },
+    {
+      "condition": [
+        "hot-p10-R480-measured",
+        "eval",
+        10,
+        480,
+        "warehouse-u-belt-v1",
+        "measured"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S3b-chunk-comp",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": 0.9610473783158723,
+      "aggregate_ci95_seed_bootstrap": [
+        0.5779453287725411,
+        1.382710195058921
+      ],
+      "mean_per_run_percent": 0.9630366316254778,
+      "mean_seconds_saved": 15.421302599999967,
+      "improved": 9,
+      "tied": 0,
+      "worse": 1,
+      "max_candidate_plan_wall_seconds": 4.809083
+    },
+    {
+      "condition": [
+        "large-p10-R960",
+        "eval",
+        10,
+        960,
+        "warehouse-large-v1",
+        "fixed"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S3b-chunk-comp",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": 0.5740350560634007,
+      "aggregate_ci95_seed_bootstrap": [
+        0.017405315085924015,
+        1.1025813900496442
+      ],
+      "mean_per_run_percent": 0.5702282771720475,
+      "mean_seconds_saved": 19.597000000000072,
+      "improved": 6,
+      "tied": 1,
+      "worse": 3,
+      "max_candidate_plan_wall_seconds": 65.494927
+    },
+    {
+      "condition": [
+        "large-p10-R960",
+        "eval",
+        10,
+        960,
+        "warehouse-large-v1",
+        "fixed"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S4b-var-LNS",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": 0.5740350560634007,
+      "aggregate_ci95_seed_bootstrap": [
+        0.017405315085924015,
+        1.1025813900496442
+      ],
+      "mean_per_run_percent": 0.5702282771720475,
+      "mean_seconds_saved": 19.597000000000072,
+      "improved": 6,
+      "tied": 1,
+      "worse": 3,
+      "max_candidate_plan_wall_seconds": 186.828617
+    },
+    {
+      "condition": [
+        "large-p10-R960-measured",
+        "eval",
+        10,
+        960,
+        "warehouse-large-v1",
+        "measured"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S3b-chunk-comp",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": 1.7244495772144706,
+      "aggregate_ci95_seed_bootstrap": [
+        0.9310457447253777,
+        2.5062456041735466
+      ],
+      "mean_per_run_percent": 1.713575843331142,
+      "mean_seconds_saved": 59.40298220000009,
+      "improved": 9,
+      "tied": 0,
+      "worse": 1,
+      "max_candidate_plan_wall_seconds": 79.374202
+    },
+    {
+      "condition": [
+        "p10-R480",
+        "eval",
+        10,
+        480,
+        "warehouse-u-belt-v1",
+        "fixed"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S3b-chunk-comp",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": 0.8446085428143336,
+      "aggregate_ci95_seed_bootstrap": [
+        0.29946014924405623,
+        1.3339581438681904
+      ],
+      "mean_per_run_percent": 0.8404893973274705,
+      "mean_seconds_saved": 13.603999999999996,
+      "improved": 9,
+      "tied": 0,
+      "worse": 1,
+      "max_candidate_plan_wall_seconds": 8.846546
+    },
+    {
+      "condition": [
+        "p10-R480",
+        "eval",
+        10,
+        480,
+        "warehouse-u-belt-v1",
+        "fixed"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S4b-var-LNS",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": 0.8446085428143336,
+      "aggregate_ci95_seed_bootstrap": [
+        0.29946014924405623,
+        1.3339581438681904
+      ],
+      "mean_per_run_percent": 0.8404893973274705,
+      "mean_seconds_saved": 13.603999999999996,
+      "improved": 9,
+      "tied": 0,
+      "worse": 1,
+      "max_candidate_plan_wall_seconds": 17.803234
+    },
+    {
+      "condition": [
+        "p10-R480-measured",
+        "eval",
+        10,
+        480,
+        "warehouse-u-belt-v1",
+        "measured"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S3b-chunk-comp",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": 2.912164799256084,
+      "aggregate_ci95_seed_bootstrap": [
+        1.9999179102925253,
+        3.679713610543246
+      ],
+      "mean_per_run_percent": 2.9083579030851485,
+      "mean_seconds_saved": 47.42276800000002,
+      "improved": 9,
+      "tied": 0,
+      "worse": 1,
+      "max_candidate_plan_wall_seconds": 6.045258
+    },
+    {
+      "condition": [
+        "p20-R480",
+        "eval",
+        20,
+        480,
+        "warehouse-u-belt-v1",
+        "fixed"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S3b-chunk-comp",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": -4.865311079046354,
+      "aggregate_ci95_seed_bootstrap": [
+        -6.268090006535725,
+        -3.4620788530465783
+      ],
+      "mean_per_run_percent": -4.821969822082599,
+      "mean_seconds_saved": -42.788999999999916,
+      "improved": 0,
+      "tied": 0,
+      "worse": 10,
+      "max_candidate_plan_wall_seconds": 0.0
+    },
+    {
+      "condition": [
+        "p20-R480",
+        "eval",
+        20,
+        480,
+        "warehouse-u-belt-v1",
+        "fixed"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S4b-var-LNS",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": -4.865311079046354,
+      "aggregate_ci95_seed_bootstrap": [
+        -6.268090006535725,
+        -3.4620788530465783
+      ],
+      "mean_per_run_percent": -4.821969822082599,
+      "mean_seconds_saved": -42.788999999999916,
+      "improved": 0,
+      "tied": 0,
+      "worse": 10,
+      "max_candidate_plan_wall_seconds": 0.0
+    },
+    {
+      "condition": [
+        "p20-R480-measured",
+        "eval",
+        20,
+        480,
+        "warehouse-u-belt-v1",
+        "measured"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S3b-chunk-comp",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": -3.3625332000956067,
+      "aggregate_ci95_seed_bootstrap": [
+        -5.001062582983821,
+        -1.7126328451176585
+      ],
+      "mean_per_run_percent": -3.3268471223961393,
+      "mean_seconds_saved": -30.000841200000014,
+      "improved": 0,
+      "tied": 0,
+      "worse": 10,
+      "max_candidate_plan_wall_seconds": 0.060511
+    },
+    {
+      "condition": [
+        "p20-R960",
+        "eval",
+        20,
+        960,
+        "warehouse-u-belt-v1",
+        "fixed"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S3b-chunk-comp",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": 0.22813962677041325,
+      "aggregate_ci95_seed_bootstrap": [
+        -0.3923645044078509,
+        0.8219851798657493
+      ],
+      "mean_per_run_percent": 0.226076373992952,
+      "mean_seconds_saved": 3.602999999999997,
+      "improved": 6,
+      "tied": 0,
+      "worse": 4,
+      "max_candidate_plan_wall_seconds": 38.399233
+    },
+    {
+      "condition": [
+        "p20-R960",
+        "eval",
+        20,
+        960,
+        "warehouse-u-belt-v1",
+        "fixed"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S4b-var-LNS",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": 0.22813962677041325,
+      "aggregate_ci95_seed_bootstrap": [
+        -0.3923645044078509,
+        0.8219851798657493
+      ],
+      "mean_per_run_percent": 0.226076373992952,
+      "mean_seconds_saved": 3.602999999999997,
+      "improved": 6,
+      "tied": 0,
+      "worse": 4,
+      "max_candidate_plan_wall_seconds": 25.046496
+    },
+    {
+      "condition": [
+        "p20-R960-measured",
+        "eval",
+        20,
+        960,
+        "warehouse-u-belt-v1",
+        "measured"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S3b-chunk-comp",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": 2.0337096623888207,
+      "aggregate_ci95_seed_bootstrap": [
+        1.1306901317303077,
+        2.857852615905891
+      ],
+      "mean_per_run_percent": 2.026595666516627,
+      "mean_seconds_saved": 32.58435509999997,
+      "improved": 9,
+      "tied": 0,
+      "worse": 1,
+      "max_candidate_plan_wall_seconds": 21.368727
+    },
+    {
+      "condition": [
+        "packed70-dup-p10",
+        "eval",
+        10,
+        480,
+        "warehouse-u-belt-v1",
+        "fixed"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S3b-chunk-comp",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": 0.6364055923187214,
+      "aggregate_ci95_seed_bootstrap": [
+        -0.1839991446712583,
+        1.4209090814573675
+      ],
+      "mean_per_run_percent": 0.6221236811309349,
+      "mean_seconds_saved": 11.003999999999996,
+      "improved": 6,
+      "tied": 0,
+      "worse": 4,
+      "max_candidate_plan_wall_seconds": 21.524613
+    },
+    {
+      "condition": [
+        "packed70-dup-p10",
+        "eval",
+        10,
+        480,
+        "warehouse-u-belt-v1",
+        "fixed"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S4b-var-LNS",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": 0.6364055923187214,
+      "aggregate_ci95_seed_bootstrap": [
+        -0.1839991446712583,
+        1.4209090814573675
+      ],
+      "mean_per_run_percent": 0.6221236811309349,
+      "mean_seconds_saved": 11.003999999999996,
+      "improved": 6,
+      "tied": 0,
+      "worse": 4,
+      "max_candidate_plan_wall_seconds": 7.489727
+    },
+    {
+      "condition": [
+        "packed70-dup-p10-measured",
+        "eval",
+        10,
+        480,
+        "warehouse-u-belt-v1",
+        "measured"
+      ],
+      "baseline": "S1-C3",
+      "candidate": "S3b-chunk-comp",
+      "seeds": [
+        203,
+        205,
+        207,
+        209,
+        211,
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "n": 10,
+      "aggregate_improvement_percent": 1.921628725250074,
+      "aggregate_ci95_seed_bootstrap": [
+        1.0014352338950445,
+        2.8540751156704878
+      ],
+      "mean_per_run_percent": 1.9014016984178053,
+      "mean_seconds_saved": 33.56674720000001,
+      "improved": 9,
+      "tied": 0,
+      "worse": 1,
+      "max_candidate_plan_wall_seconds": 6.971134
+    }
+  ],
+  "limitations": [
+    "Round1 predates planner-serialization fix; historical only",
+    "Reused seed IDs require disclosure; fresh independent evaluation absent",
+    "Repeated machine timing is absent",
+    "Inactive variable splitting cannot establish its effectiveness",
+    "LNS propagation into issued work is not established by unchanged makespan"
+  ]
+}

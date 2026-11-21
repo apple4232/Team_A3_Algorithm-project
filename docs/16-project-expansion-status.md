@@ -1,119 +1,82 @@
-# Project Expansion: Progress and Follow-up
+# Project Expansion: Final Status and Closure
 
-Updated November 20, 2026. Branch: `project-expansion`; review: PR #7.
+Recorded November 21, 2026. Branch: `project-expansion`.
 
-## Current status
+## Decision
 
-The extension now includes a follow-up implementation, strengthened tests and 474 saved follow-up experiment records. Selected earlier gaps have been addressed; the extension is still an experimental simulator, not a production scheduler or a completed validation study.
+The user ended the current expansion exploration and requested that PR #7 be closed without merging. Preserve the branch, code, plans, experiments and negative results as an exploratory prototype. The original single-picker project remains the primary deliverable.
 
-현재 상태: 순차 계획 자원 결함 수정, 이중 개선율 분석, 20인 연속 작업 및 혼잡 v2 실험을 반영했다. 전체 테스트 74개와 저장 자료 재분석을 확인했다. 혼잡 안정화·민감도·창고 규모 실험 등은 남아 있다.
+현재 상태: **확장 탐색 종료·코드와 연구 기록 보존**. 일부 합성 조건의 개선을 관측했지만 일반 적용 가능성·계산 예산·최종 독립 검증을 함께 확보하지 못했다. 새 성능 실험을 계속하지 않고 결과와 한계를 정리한다. PR #7은 병합 없이 닫는다.
 
-Read the [tracked plan](17-expansion-plan.md) for target behavior and the [design and results](15-multi-picker-simulation.md) for model details. Acceptance criteria in the plan are not a blanket completion claim.
+Start with the [complete development and closure record](20-expansion-study-record.md). It supersedes overbroad statements in earlier stage reports.
 
-## History and provenance
+## What is preserved
 
-- Base: `code-verification` at `ff03681`.
-- Initial implementation/report/evidence: `782cce6`, `dea2f1b`, `213a076`.
-- Branch publication and tracked plan: `914c9a8`, `4b43d61`.
-- Imported follow-up `371df7048141f3550260bae96eb2d1227a8f36cd` becomes `81a0a68` on this branch.
-- Imported follow-up `61d49bafcd2a9a8d61acae15d7b7912fbabc9ba4` becomes `028bf35`; the design-report conflict was resolved while preserving the branch's caveats.
+- U-shaped conveyor, repeated tasks, pickup service/waiting and sequential planning simulation.
+- One/ten/twenty pickers; 10/30-second handling, 40/60 mix, five-second unloading and previous-unload starts.
+- Spatial chunks, balance, round-robin reference, moves/swaps and congestion v1/v2/auto.
+- NN, 2-opt, reinsertion, alternating search and optional segment DP.
+- One-step unloading lookahead, savings bundling, availability/location-aware completion scheduling, minimum-task splitting and experimental LNS.
+- Original planning-resource bug and its fix, flag propagation fixes, stronger tests and analysis corrections.
+- Full commit history through `c5e8df3` plus archive documentation.
 
-The original `picking/` implementation remains unchanged. Performance records were produced by the supplying implementation run; this integration reran tests and analysis, not the complete performance matrix.
+These features are not all recommended or fully validated. The LNS integration has disclosed group/order/owner consistency risks. The variable split policy was inactive in evaluated conditions. No silent behavioral fix was made while archiving.
 
-## Implemented scope
+## Evidence and current checks
 
-The separate `simulation/` package supports a graph warehouse, U-shaped conveyor access, continuous tasks starting at previous unload points, spatial/balanced assignment, unissued-request moves/swaps, NN/2-opt/reinsertion combinations, alternating improvement and optional segment DP.
+The full suite **passed 88 tests** during archive integration. This includes 37 baseline and 51 extension tests. The original `picking/` package remains unchanged.
 
-Collection is 10 or 30 seconds per item with a 40/60 mix; unloading is 5 seconds. Pickup zones have FIFO capacity constraints. Fixed-delay and measured-delay computation modes model planning overlap.
+Saved experiment records total **2,280**:
 
-Follow-up changes include:
+- Round 1: 786, generated before the planner-serialization fix; historical only.
+- Round 2: 474, post-fix repeated-task and congestion comparisons.
+- Round 3: 220 development and 420 evaluation-set comparisons.
+- Round 4: 20 development and 360 fixed/measured comparisons.
 
-- Sequential planner resource occupancy throughout an operation, preventing overlapping planning operations.
-- Persisted task/picker records and adoption/abort information.
-- Aggregate completion-time improvement and mean per-run improvement, with separate paired seed-group bootstrap calculations.
-- Congestion v2: staggered LPT-based forecasts and lexicographic candidate evaluation. It remains optional, with congestion awareness off by default.
-- Additional exact timing, event-order, small-route and interruption checks.
+Record counts do not mean that many independent workloads. Saved-data archive reaggregation was executed; no full performance experiment or new parameter search was run in this packaging task. [Machine-readable counts, file checksums and comparisons](../results/expansion-archive-summary.json) are included. Checksums normalize CRLF to LF for portability.
 
-The default warehouse is still 36 by 40 m; shelf-side labels are synthetic and conveyor access is discretized. Aisle collisions do not delay walking. Evaluation-count limits are not strict wall-clock deadlines.
+## Qualified observations
 
-## Integration checks actually performed
+- Round 3: cap24/balanced/NN→2-opt→reinsertion versus cap12/spatial/NN reduced completion by about 3.84% (64.7 seconds) in the ten-picker/480-request condition. Cap expansion explains most of the common-baseline ladder difference; 2-opt alone does not explain this gain.
+- The larger-layout/960-request comparison reports about 10.94%, but geometry, density and request volume differ from the small-layout comparison. Size alone is not a proven cause.
+- Round 4: completion scheduling versus the cap24 candidate improves the ten-picker/480-request comparison by about 0.845% (13.6 seconds) in fixed mode, and 2.912% (47.4 seconds) in measured mode. Keep modes separate.
+- Twenty pickers/480 requests worsens: approximately -2.28% in the cap comparison and -4.865% fixed / -3.363% measured in the completion comparison.
+- Savings, congestion and lookahead do not establish a stable preferred policy in tested conditions. Inactive splitting and unresolved LNS propagation do not establish algorithmic ineffectiveness.
 
-- `python -m unittest discover -s tests`: **74 passed** (37 original and 37 extension tests).
-- Parsed five `results/multi2/*.jsonl` files: fixed-total 126, per-picker 84, continuous20 84, fixed20 84, congestion 96; **474 records**.
-- Executed `python -I simulation/analysis2.py results/multi2` on the saved data. [Analysis output](../results/multi2/analysis-summary.txt) is included.
-- Recomputed the historical JSONL records separately. [Historical analysis](../results/multi/analysis2-historical.txt) is descriptive only.
-- Corrected analysis labels so follow-up per-picker records are not called first-round defective records; chained-start totals and per-run means are explicitly distinguished.
-- Reclassified positive-only waiting/distance aggregates as descriptive information, not causal proof.
+## Why this is not a final scheduling recommendation
 
-Full performance experiments were not rerun during integration. Current tests verify specific properties, not every possible schedule or every plan acceptance.
+Planning costs exceed the predeclared 15-second threshold in some conditions; a measured large-layout case reaches about 79.4 seconds. A common baseline cost does not waive that failure.
 
-## Results and their scope
+Successive rounds reuse evaluation seed IDs 203–221 (odd numbers); fresh project-wide independent evaluation and repeated same-input timing were not completed. Basket capacity is absent; cap24 is 24 requests, not 24 item units. Geometry/side labels are synthetic and aisle collisions do not impose delay.
 
-For the 20-picker NN baseline, the saved records show one task per picker at 240 requests, two at 480, and four at 960. Non-staging subsequent starts are respectively 0, 20 and 60 per run in those conditions.
+Conditional improvements are useful observations, but cannot be generalized to real facilities or all worker/task configurations.
 
-At 480 requests, evaluation aggregate completion improvement is about **0.23%** for fixed-delay `nn-2opt-reinsert` (95% interval 0.05–0.55), **0.27%** for its measured-delay counterpart (0.09–0.48), and **0.30%** for measured alternating search (0.13–0.52). Measured `nn-2opt-reinsert` saves approximately 2.3 seconds per run, with 7 improved and 3 worse runs.
+## Deferred work, only if the extension is resumed
 
-At 240 requests the fixed-delay completion improvement is zero, but this does not prove no route can improve. At 960 requests the fixed-delay estimate is about 0.06%, with an interval including zero. Repeated tasks therefore do not guarantee an improvement. Do not assert NN optimality from unchanged heuristic output or infer that task chaining alone causes the effect.
+- [ ] Validate and repair LNS group/order/owner propagation and exception visibility before interpreting its results.
+- [ ] Calibrate physical workload limits and warehouse geometry or state the abstract assumptions explicitly.
+- [ ] Freeze policies and computation budget, then use fresh evaluation groups.
+- [ ] Repeat method timings and distinguish exposed delay from summed worker waiting.
+- [ ] Trace predictions to issued work and actual completion in congestion/reassignment experiments.
+- [ ] Isolate warehouse-scale, demand, handling-time and batching effects.
 
-Congestion v2 evaluation results versus congestion-off have mean per-run completion changes of **+0.12% at ten pickers and -2.97% at twenty**. Mean waiting falls by about 54/61 seconds; mean distance changes by **-4/+7 m**, respectively. Prediction MAE improves, but distance does not decrease in every condition and completion remains unstable. Congestion v2 is an experimental candidate, not a recommended default.
+These are future conditions, not an active commitment to continue experimentation.
 
-The 209.9-second planning-wait figure for the measured 20-picker/960-request condition is a sum across pickers averaged across runs. It is not an additional 209.9 seconds to add to episode makespan. Forecast mismatch and bottleneck explanations require further controlled analysis.
+## Documents and reproduction
 
-## Historical data warning
-
-`results/multi/` preserves the initial 786 records, including a 24-record stress JSON array. They were generated before the planner-serialization fix. Neither absolute timing nor relative method ranking is automatically reliable: a common defect can affect competing methods differently through dispatch, assignment and congestion.
-
-Keep those records as historical exploratory evidence. Use `results/multi2/` for current post-fix numerical claims. The historical reanalysis reads 762 JSONL records; the separate 24-record stress array is not included in that analysis.
-
-## Addressed in the supplied follow-up
-
-- [x] Sequential planning-resource defect fixed and regression checked.
-- [x] Saved records for 20-picker repeated tasks and three demand-comparison designs added.
-- [x] Two improvement formulas and formula-specific bootstrap intervals implemented.
-- [x] Absolute savings, deterioration, computation and waiting metrics reported.
-- [x] Congestion v1/v2 comparisons and adoption logs added.
-- [x] Eleven stronger timing/event/interruption tests added; full suite passes.
-
-These describe implemented checks and evidence; they do not certify the entire research plan as complete.
-
-## Remaining work
-
-- [ ] Pair each adopted candidate's forecast with its actual downstream outcome; aggregate adoption counts do not establish causality.
-- [ ] Stabilize congestion-aware scheduling and verify improvements on independent data before considering default adoption.
-- [ ] Repeat method timing measurements on identical workloads; randomized ordering in the existing suite is not repeated timing validation.
-- [ ] Test walking/handling-time sensitivity and larger/different warehouse geometries.
-- [ ] Review synthetic shelf-side geometry and conveyor approximation beyond current cases.
-- [ ] Verify coverage of all interruption phases, path-level validity and non-issued-work invariants beyond the existing injected checkpoints.
-- [ ] Review the old exact 990 m claim separately; second-round evidence is not direct recovery of missing first-round task records.
-- [ ] Keep causal claims about chained starts, balance and planning delay as hypotheses unless controlled comparisons support them.
-
-## Reproduction
-
-From the repository root, using Python 3.12 and the standard library:
+- [Full history, algorithms, defects, findings and closure](20-expansion-study-record.md)
+- [Target plan](17-expansion-plan.md)
+- [Initial model and follow-up](15-multi-picker-simulation.md)
+- [Batching evidence and corrected criteria](18-evidence-experiments.md)
+- [Completion/savings/LNS evidence and caveats](19-completion-assignment-lns.md)
+- [Source](../simulation/) and [tests](../tests/test_simulation.py)
 
 ```powershell
 $env:PYTHONIOENCODING='utf-8'
 python -m unittest discover -s tests
+python -m simulation.archive_summary results/expansion-archive-summary-rerun.json
 python -I simulation/analysis2.py results/multi2
-python -I simulation/analysis2.py results/multi
+python -I simulation/analysis3.py results/multi3-eval
 ```
 
-Full rerun, if later needed (not performed during this integration):
-
-```powershell
-python -m simulation.experiments2 results/multi2-rerun
-```
-
-Choose a new directory. Measured results depend on the machine. Never overwrite the inherited evidence.
-
-## Evidence index
-
-- [Simulation source](../simulation/)
-- [Tests](../tests/test_simulation.py)
-- [Follow-up experiment runner](../simulation/experiments2.py)
-- [Dual-formula analysis](../simulation/analysis2.py)
-- [Follow-up records](../results/multi2/)
-- [Historical records](../results/multi/)
-- [Plan](17-expansion-plan.md)
-
-PR #7 remains a draft; this update does not merge the extension.
+The archive-summary command reads saved data only. Choose a new output file to preserve the packaged summary. Full experiment commands remain in documents 18 and 19 for a future resumption; they are not required to read this archive.

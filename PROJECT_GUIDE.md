@@ -1,6 +1,6 @@
 # Project Guide: Scope, Progress, and Team Responsibilities
 
-> **Expansion branch:** start with [Project Expansion: Progress and Follow-up](docs/16-project-expansion-status.md) for the implemented multi-picker simulation, inherited experiments, and pending corrections. The historical scope below describes the original single-picker baseline.
+> **Expansion archive:** the user ended the current exploration without merging it. Read the [complete expansion record](docs/20-expansion-study-record.md) and [closure status](docs/16-project-expansion-status.md) before interpreting older results. Code and evidence remain on `project-expansion`; they do not replace the original single-picker study below.
 
 As of November 6, 2026.
 

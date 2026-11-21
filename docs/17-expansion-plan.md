@@ -118,4 +118,4 @@ Include absolute seconds saved, travel, waiting, imbalance, idle time, planning 
 - [ ] Preserve original single-picker regression coverage and fixed-delay reproducibility.
 - [ ] Perform development selection followed by independent evaluation and sensitivity studies.
 
-The initial 786 records are preserved as historical evidence predating a planner-serialization fix. Follow-up changes and 474 post-fix records are now integrated; 74 tests passed during integration. This acceptance checklist remains the target specification rather than a blanket completion claim. See [current status](16-project-expansion-status.md) for addressed checks, new findings and remaining validation.
+The initial 786 records predate a planner-serialization fix and are historical only. All later work through the fourth round is now preserved, for 2,280 records total and 88 passing tests at archive integration. The user ended this exploration and requested PR #7 be closed without merging. Unchecked acceptance items are future work, not commitments to continue. See the [complete record and closure decision](20-expansion-study-record.md).
